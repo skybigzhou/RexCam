@@ -1,6 +1,7 @@
 import cv2
 import time
-
+import json
+import os
 
 class VideoCapture():
     """
@@ -52,15 +53,35 @@ class VideoCapture():
         source WEBCAM     :
         source localFile  : 
         '''
+
+        '''
         if self.source == "AWSCAM":
             import awscam
-            #TODO: check awscam.getLastFrame()
             ret, frame = awscam.getLastFrame()
             return (ret, frame)
 
         else:
-            #TODO: check opencv.VideoCapture.read()
             ret, frame = self.cap.read()
             return (ret, frame)
+        '''
+        
+        save_dir = "/home/aws_cam/Desktop/video"
+        metadata = os.path.join(save_dir, "metadata.json")
+        num = float(time.time())
+        
+        data = dict()
+        with open(metadata, "r", os.O_NONBLOCK) as f:
+            data = json.load(f)
+
+        ans = data[num] if num in data.keys() else data[min(data.keys(), key=lambda k: abs(float(k)-num))]
+        print(ans)
+        ret = True
+        frame = cv2.imread(os.path.join(save_dir, "frame_" + str(ans) + ".jpg"), 1)
+        
+        return (ret, frame)
 
         raise NotImplementedError("Read Last Frame Not Implemented Yet")
+
+
+
+

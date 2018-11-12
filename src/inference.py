@@ -42,6 +42,7 @@ def intel_process(task, model_path, source, nickname):
         start_time = time.time()
         model_dict = dict()
         model_dict[nickname] = awscam.Model(model_path, {'GPU': 1})
+        
         controller = "/home/aws_cam/Desktop/controller.txt"
         f = open(controller, "w")
         f.write(nickname)
@@ -57,12 +58,16 @@ def intel_process(task, model_path, source, nickname):
         input_dict = dict()
         input_dict[nickname] = (512, 512)
         input_dict['mxnet_resnet50'] = (300, 300)
+        
         # Do inference until the lambda is killed.
-        if source is "AWSCAM" or source is "WEBCAM":
+		
+        if source == "AWSCAM" or source == "WEBCAM":
+            print("Auto Save Start")
             auto_save = InfiniteVideoCapture()
             auto_save.start()
         
         cap = set_up(source)
+        time.sleep(5)
         while True:
             
             # Get a frame from the video stream

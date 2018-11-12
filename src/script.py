@@ -35,7 +35,7 @@ def _get_parser():
     parser.add_argument(
         '-nickName', '-n',
         type=_text_type,
-        help="Model Nick Name")
+        help="Model Nick Name, used for control model switch")
 
     parser.add_argument(
         "--source", "-s",
@@ -51,7 +51,10 @@ def _semantic_check_and_run(args):
     framework = args.framework
     model_path = args.modelPath
     source = str(args.source)
-    nickname = args.nickName
+    if args.nickName:
+        nickname = args.nickName
+    else:
+        nickname = "User_Model_0"
 
     if "." in model_path:
         reply = raw_input("WARNING: file suffix should not be included, would you like to continue(y/n): ")

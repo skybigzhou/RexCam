@@ -3,54 +3,71 @@ import cv2
 import numpy as np
 import os
 import time
-from datetime import datetime
+import json
 
 class LocalSave(Thread):
+    '''
+    
+    '''
     def __init__(self):
         super(LocalSave, self).__init__()
-        self.frame = None
+        # Initialize the default image to be a white canvas. Clients
+        # will update the image when ready.
+        self.frame = cv2.imencode('.jpg', 255*np.ones([640, 480, 3]))[1]
+        self.counter = 0
+        self.change = False
+        self.first = True
         self.timestamp = ""
-        self.pre_timestamp = ""
         self.stop_request = Event()
 
-        # raise NotImplementedError("LocalSave constructor not implemented")
 
+    def _update_metadata(self, save_dir, test):
+        """Dummy Solution"""
+        if test:
+            start_time = time.time()
+        
+        data_file = os.path.join(save_dir, 'metadata.json')
+        if self.first:
+            with open(data_file, 'w', os.O_NONBLOCK) as f:
+                json.dump({self.timestamp: self.counter}, f)
+            self.first = False
+        else:
+            data = dict()
+            with open(data_file, 'r', os.O_NONBLOCK) as f:
+                data = json.load(f)
+        
+            with open(data_file, 'w', os.O_NONBLOCK) as f:
+                data[self.timestamp] = self.counter
+                json.dump(data, f)
+            
+        
+        if test:
+            print(time.time() - start_time)
+    
 
 
     def run(self):
+        # TODO: Maintain a MetaData
         save_dir = '/home/aws_cam/Desktop/video/'
 
-        '''
-        if not os.path.exists(save_path):
-            os.mkfifo(save_path)
-
-        with open(save_path, 'a', os.O_NONBLOCK) as fifo_file:
-            while not self.stop_request.isSet():
-                try:
-                    # Write the data to the FIFO file. This call will block
-                    # meaning the code will come to a halt here until a consumer
-                    # is available.
-                    fifo_file.write(self.frame.tobytes())
-                    fifo_file.flush()
-                except IOError:
-                    continue
-        '''
         if not os.path.isdir(save_dir):
             os.mkdir(save_dir)
 
         while not self.stop_request.isSet():
             try:
-                if self.frame is None and self.timestamp == self.pre_timestamp:
+                if not self.change:
                     continue
-                cv2.imwrite(os.path.join(save_dir, self.timestamp + ".jpg"), self.frame)
-                self.pre_timestamp = self.timestamp
+                test = False
+                cv2.imwrite(os.path.join(save_dir, "frame_" + str(self.counter) + ".jpg"), self.frame)
+                self._update_metadata(save_dir, test)
+                self.counter += 1
             except IOError:
                 continue
 
 
-
     def set_frame_data(self, frame, timestamp):
-        self.frame = cv2.resize(frame, (858, 480))
+        self.frame = frame
+        self.change = True
         self.timestamp = timestamp
 
 
