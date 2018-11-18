@@ -54,33 +54,44 @@ class VideoCapture():
         source localFile  : 
         '''
 
-        '''
+        # READ FROM AWSCAM OR WEBCAM
+        
         if self.source == "AWSCAM":
             import awscam
             ret, frame = awscam.getLastFrame()
             return (ret, frame)
 
-        else:
+        elif self.source == "WEBCAM":
             ret, frame = self.cap.read()
             return (ret, frame)
-        '''
+
+        else:
+            pass
         
+
+        # READ FROM LOCAL DISK WITH METADATA
+        ''' 
         save_dir = "/home/aws_cam/Desktop/video"
-        metadata = os.path.join(save_dir, "metadata.json")
+        metadata = os.path.join(save_dir, "metadata.txt")
         num = float(time.time())
         
         data = dict()
         with open(metadata, "r", os.O_NONBLOCK) as f:
-            data = json.load(f)
+            lines = f.readlines()
+            for line in lines:
+                line = (line.strip()).split(',')
+                data[line[0]] = line[1]
 
+        start_time = time.time()
         ans = data[num] if num in data.keys() else data[min(data.keys(), key=lambda k: abs(float(k)-num))]
-        print(ans)
         ret = True
         frame = cv2.imread(os.path.join(save_dir, "frame_" + str(ans) + ".jpg"), 1)
-        
-        return (ret, frame)
+        print(ans, time.time() - start_time)
 
-        raise NotImplementedError("Read Last Frame Not Implemented Yet")
+        return (ret, frame)
+        '''
+        
+        raise NotImplementedError("Local file read last frame not defined.")
 
 
 

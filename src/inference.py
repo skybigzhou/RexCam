@@ -1,6 +1,6 @@
 from localDisplay import LocalDisplay
-from videoFrameStack import InfiniteVideoCapture
 from wrapper import VideoCapture
+from videoFrameStack import LocalSave
 import os
 import json
 import time
@@ -36,6 +36,11 @@ def intel_process(task, model_path, source, nickname):
         local_display = LocalDisplay('480p')
         local_display.start()
         
+        if source == "AWSCAM" or source == "WEBCAM":
+            print("Auto Save Start")
+            auto_save = LocalSave(source)
+            auto_save.start()
+
         # Load the model onto the GPU.
         
         print("Loading Model ...")
@@ -60,14 +65,8 @@ def intel_process(task, model_path, source, nickname):
         input_dict['mxnet_resnet50'] = (300, 300)
         
         # Do inference until the lambda is killed.
-		
-        if source == "AWSCAM" or source == "WEBCAM":
-            print("Auto Save Start")
-            auto_save = InfiniteVideoCapture()
-            auto_save.start()
         
         cap = set_up(source)
-        time.sleep(5)
         while True:
             
             # Get a frame from the video stream

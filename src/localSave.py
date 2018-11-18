@@ -26,7 +26,9 @@ class LocalSave(Thread):
         if test:
             start_time = time.time()
         
-        data_file = os.path.join(save_dir, 'metadata.json')
+        data_file = os.path.join(save_dir, 'metadata.txt')
+        
+        '''
         if self.first:
             with open(data_file, 'w', os.O_NONBLOCK) as f:
                 json.dump({self.timestamp: self.counter}, f)
@@ -34,12 +36,15 @@ class LocalSave(Thread):
         else:
             data = dict()
             with open(data_file, 'r', os.O_NONBLOCK) as f:
-                data = json.load(f)
+                str_read = f.read()
+                data = json.loads(str_read)
         
             with open(data_file, 'w', os.O_NONBLOCK) as f:
                 data[self.timestamp] = self.counter
                 json.dump(data, f)
-            
+        '''
+        with open(data_file, 'a', os.O_NONBLOCK) as f:
+            f.write(str(self.timestamp) + "," + str(self.counter)+ "\n")
         
         if test:
             print(time.time() - start_time)
