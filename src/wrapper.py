@@ -66,7 +66,8 @@ class VideoCapture():
             return (ret, frame)
 
         else:
-            pass
+            ret, frame = self.cap.read()
+            return (ret, frame)
         
 
         # READ FROM LOCAL DISK WITH METADATA

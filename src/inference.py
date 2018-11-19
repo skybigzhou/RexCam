@@ -36,10 +36,13 @@ def intel_process(task, model_path, source, nickname):
         local_display = LocalDisplay('480p')
         local_display.start()
         
+        # Separate Data Management with Logic Script
+        '''
         if source == "AWSCAM" or source == "WEBCAM":
             print("Auto Save Start")
             auto_save = LocalSave(source)
             auto_save.start()
+        '''
 
         # Load the model onto the GPU.
         

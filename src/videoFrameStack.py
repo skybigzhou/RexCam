@@ -30,7 +30,7 @@ class Command(object):
         self.thread.join(timeout)
         if self.process and self.thread.is_alive():
             print("Timeout Process Terminated")
-            self.process.terminate()
+            # self.process.terminate()
             self.thread.join()
         # print(self.process.returncode)
 

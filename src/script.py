@@ -33,7 +33,7 @@ def _get_parser():
         help="Path to the label file (detect .json file or python dict())")
 
     parser.add_argument(
-        '-nickName', '-n',
+        '--nickName', '-n',
         type=_text_type,
         help="Model Nick Name, used for control model switch")
 
