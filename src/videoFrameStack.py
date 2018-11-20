@@ -9,18 +9,19 @@ import subprocess
 
 
 class Command(object):
-    def __init__(self, cmd):
+    def __init__(self, cmd, name):
         self.cmd = cmd
         self.process = None
         self.thread = None
+        self.name = name
 
 
     def run(self):
         def h264Save():
-            print("Start Saving in a New Video Stream")
+            print("Start Saving in a New Video Stream {}".format(self.name))
             self.process = subprocess.Popen(self.cmd, shell=True)
             self.process.communicate()
-            print("Saving Ended")
+            print("Saving Ended {}".format(self.name))
 
         self.thread = Thread(target = h264Save)
         self.thread.start()
@@ -45,12 +46,13 @@ class LocalSave(Thread):
     saving instance thread on to ensure parallelize fetching video feed
     and write to the disk.
     '''
-    def __init__(self, source, timeout=60, overlap=10):
+    def __init__(self, source, timeout, chunk_timeout=60, overlap=10):
         super(LocalSave, self).__init__()
         self.stop_request = Event()
         self.counter = 0
         self.source = source
-        self.timeout = timeout
+        self.ttimeout = timeout
+        self.timeout = chunk_timeout
         self.overlap = overlap
         self.last_command = None
 
@@ -60,13 +62,22 @@ class LocalSave(Thread):
         local_save = LocalSave()
         local_save.start()
         '''
+        command = Command("timeout {} cat /opt/awscam/out/ch1_out.h264 > /home/aws_cam/Desktop/local_video/out.h264".format(self.ttimeout), "out.h264")
+        command.run()
+
         if self.source == "AWSCAM":
             while not self.stop_request.isSet():
                 
-                command = Command("timeout {0} cat /opt/awscam/out/ch1_out.h264 > /home/aws_cam/Desktop/local_video/tmp_{1}.h264".format(
-                                self.timeout, self.counter))
+                time.sleep(self.timeout)
+                command = Command("cp /home/aws_cam/Desktop/local_video/out.h264 /home/aws_cam/Desktop/local_video/tmp_{1}.h264".format(
+                                self.timeout, self.counter), "tmp_{}.h264".format(self.counter))
+
                 command.run()
                 
+                self.counter += 1
+                
+
+                '''
                 if self.last_command:
                     self.last_command.join(self.overlap)
                     self.counter += 1
@@ -76,7 +87,7 @@ class LocalSave(Thread):
                     self.counter += 1
                     self.last_command = command
                     time.sleep(self.timeout - self.overlap)
-
+                '''
         else:
             raise NotImplementedError("WEBCAM is not supported for local save yet")
 
@@ -95,5 +106,6 @@ class LocalSave(Thread):
         '''
 
 
-    def join(self):
+    def stop(self, timeout):
+        time.sleep(timeout)
         self.stop_request.set()

@@ -8,12 +8,15 @@ import numpy as np
 import cv2
 
 
-def set_up(source):
-    cap = VideoCapture(source)
-    return cap
+def _get_index(start_time, fps, timeout, duration):
+    chunk_idx = int((start_time + duration) / timeout) + 1
+    frame_idx = fps* start_time
+    print("Loading from video tmp_{0}.h264 from frame {1} to frame {2}".format(chunk_idx, frame_idx+1, (start_time+duration)*fps))
+
+    return chunk_idx, frame_idx
 
 
-def intel_process(task, model_path, source, nickname):
+def inference_local(startTime, duration, model_path, source, nickname, task):
     try:
         import awscam
     except ImportError:
@@ -33,25 +36,15 @@ def intel_process(task, model_path, source, nickname):
         # Create a local display instance that will dump the image bytes to a FIFO
         # file that the image can be rendered locally.
         
-        local_display = LocalDisplay('480p', 'results.mjpeg')
+        local_display = LocalDisplay('480p', 'results_local.mjpeg')
         local_display.start()
-        
-        # Separate Data Management with Logic Script
-        '''
-        if source == "AWSCAM" or source == "WEBCAM":
-            print("Auto Save Start")
-            auto_save = LocalSave(source)
-            auto_save.start()
-        '''
 
-        # Load the model onto the GPU.
-        
         print("Loading Model ...")
         start_time = time.time()
         model_dict = dict()
         model_dict[nickname] = awscam.Model(model_path, {'GPU': 1})
         
-        controller = "/home/aws_cam/Desktop/controller.txt"
+        controller = "/home/aws_cam/Desktop/controller_local.txt"
         f = open(controller, "w")
         f.write(nickname)
         f.close()
@@ -66,19 +59,25 @@ def intel_process(task, model_path, source, nickname):
         input_dict = dict()
         input_dict[nickname] = (512, 512)
         input_dict['mxnet_resnet50'] = (300, 300)
+
+        fps = 24
+        timeout = 10
         
-        # Do inference until the lambda is killed.
-        
-        cap = set_up(source)
-        while True:
-            
-            # Get a frame from the video stream
+        chunk_idx, frame_idx = _get_index(startTime, fps, timeout, duration)
+
+        file_dir = "/home/aws_cam/Desktop/local_video"
+        file_name = "tmp_{}.h264".format(chunk_idx)
+
+        cap = cv2.VideoCapture(os.path.join(file_dir, file_name))
+        ret = cap.set(1, frame_idx)
+
+        for i in xrange(fps*duration):
             start_time = time.time()
-            ret, frame = cap.readLastFrame()
+            ret, frame = cap.read()
+
             if not ret:
                 raise Exception('Failed to get frame from the stream')
-            # Resize frame to the same size as the training set.
-            
+
             anaytics_switch = os.path.isfile(controller)
             if (not anaytics_switch):
                 pass
@@ -127,24 +126,20 @@ def intel_process(task, model_path, source, nickname):
                         # Store label and probability to send to cloud
                         cloud_output[output_map[obj['label']]] = obj['prob']
             # Set the next frame in the local display stream.
-            cv2.putText(frame, "FPS: {:.2f}".format(1.0 / (time.time() - start_time)), (10, 50), cv2.FONT_HERSHEY_SIMPLEX, yscale, (255, 165, 20), int(yscale*2))
+            # cv2.putText(frame, "FPS: {:.2f}".format(1.0 / (time.time() - start_time)), (10, 50), cv2.FONT_HERSHEY_SIMPLEX, yscale, (255, 165, 20), int(yscale*2))
+            cv2.putText(frame, "Frame Number: " + str(frame_idx+i+1), (10, 50), cv2.FONT_HERSHEY_SIMPLEX, yscale, (255, 165, 20), int(yscale*2))
             local_display.set_frame_data(frame)
-            # Send results to the cloud
+
             if (not anaytics_switch):
                 pass
             else:
-                print(json.dumps(cloud_output), time.time() - start_time)
-            
+                print(json.dumps(cloud_output), time.time() - start_time, frame_idx+i+1)
+
     except Exception as ex:
-        print(ex)
+        print(ex)    
 
 
-def mxnet_process(model_path, weight_path):
-    raise NotImplementedError()
 
 
-def tensorflow_process(model_path):
-    raise NotImplementedError()
 
-        
 

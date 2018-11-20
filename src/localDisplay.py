@@ -12,7 +12,7 @@ class LocalDisplay(Thread):
         results can be rendered using mplayer by typing:
         mplayer -demuxer lavf -lavfdopts format=mjpeg:probesize=32 /tmp/results.mjpeg
     """
-    def __init__(self, resolution):
+    def __init__(self, resolution, file_name):
         """ resolution - Desired resolution of the project stream """
         # Initialize the base class, so that the object can run on its own
         # thread.
@@ -26,6 +26,7 @@ class LocalDisplay(Thread):
         # will update the image when ready.
         self.frame = cv2.imencode('.jpg', 255*np.ones([640, 480, 3]))[1]
         self.stop_request = Event()
+        self.file_name = file_name
 
     def run(self):
         """ Overridden method that continually dumps images to the desired
@@ -34,7 +35,9 @@ class LocalDisplay(Thread):
         # Path to the FIFO file. The lambda only has permissions to the tmp
         # directory. Pointing to a FIFO file in another directory
         # will cause the lambda to crash.
-        result_path = '/tmp/results.mjpeg'
+        # result_path = '/tmp/results.mjpeg'
+        result_path = os.path.join('/tmp', self.file_name)
+
         # Create the FIFO file if it doesn't exist.
         if not os.path.exists(result_path):
             os.mkfifo(result_path)

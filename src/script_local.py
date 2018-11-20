@@ -1,14 +1,26 @@
 import sys
 import argparse
 import os
-import inference
+import inference_local
 from six import text_type as _text_type
 
 
-
 def _get_parser():
-    parser = argparse.ArgumentParser(description="Please Input Inference Model Info")
+    parser = argparse.ArgumentParser(description="Please Input Local Inference Info")
 
+    parser.add_argument(
+        "--startTime", "-st",
+        type=int,
+        default=0,
+        help="Start time for local inference")
+
+    parser.add_argument(
+        "--duration", "-d",
+        type=int,
+        default=0,
+        help="Duration for local inference")
+
+    '''
     parser.add_argument(
         "--framework", "-f",
         type=_text_type,
@@ -16,10 +28,13 @@ def _get_parser():
         required=True,
         help="Identify your model framework (deeplens only support intel_mo_IR and mx/tf with cpu)")
 
+
+    '''
     parser.add_argument(
         "--modelTask", "-t",
         type=_text_type,
         help="Identify your model task (recently only support Object Detection/ Classification)")
+
 
     parser.add_argument(
         "--modelPath", "-mp",
@@ -47,40 +62,23 @@ def _get_parser():
 
 
 def _semantic_check_and_run(args):
-    framework = args.framework
-    model_path = args.modelPath
+    start_time = args.startTime
+    duration = args.duration
+    model_path = str(args.modelPath) + ".xml"
     source = str(args.source)
     if args.nickName:
         nickname = args.nickName
     else:
         nickname = "User_Model_0"
 
-    if "." in model_path:
-        reply = raw_input("WARNING: file suffix should not be included, would you like to continue(y/n): ")
-        if not (reply.lower() == "y" or reply.lower() == "yes"):
-            return
-
     if args.modelTask:
         task = str(args.modelTask)
 
-    if args.framework == "tf" or args.framework == "tensorflow":
-        inference.tensorflow_process(str(model_path + ".pb"))
+    print("Start time: {}s".format(start_time))
+    print("Duration: {}s".format(duration))
+    inference_local.inference_local(start_time, duration, model_path, source, nickname, task)
 
-    elif args.framework == "mx" or args.framework == "mxnet":
-        model_path = str(model_path + "-symbol.json")
-        weight_path = str(model_path + "-0000.params")
-        inference.mxnet_process(model_path, weight_path)
 
-    elif args.framework == "intel_mo_IR":
-        try:
-            inference.intel_process(task, str(model_path + ".xml"), source, nickname)
-        except Exception:
-            print("Error: Task Not Clarified")
-
-    #TODO: convert input label file
-    if args.labelPath:
-        pass
-    
 
 def main():
     parser = _get_parser()
