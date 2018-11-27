@@ -17,7 +17,7 @@ def intel_process(task, model_path, source, nickname):
     try:
         import awscam
     except ImportError:
-        pass
+        print("WARNING: AWSCAM is not available in this device")
 
     """ Entry point of the lambda function"""
     try:
