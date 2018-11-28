@@ -10,6 +10,9 @@ except ImportError:
 from multiprocessing.connection import Listener, Client
 from threading import Thread
 
+global local_address
+local_address = ('localhost', 6000)
+
 
 class Model_Dict(object):
 
@@ -26,8 +29,6 @@ class Model_Dict(object):
         return self._dict[key][0]
 
     def get_model(self, key):
-        print("Want get model ...")
-        print(self._dict[key][1])
         return self._dict[key][1]
 
     def set_dict(self, key, value):
@@ -63,26 +64,30 @@ def preload_models(args):
         except Exception as ex:
             print(ex)
 
-    pprint.pprint(model_dict.get_all_dict())
-
 
 def local_listener():
-    local_address = ('localhost', 6000)
     listener = Listener(local_address, authkey="localModel")
-    conn = listener.accept()
-    print("connection accepted from", listener.last_accepted)
     while True:
+        conn = listener.accept()
+        print("connection accepted from", listener.last_accepted)        
         msg = conn.recv()
+        print(msg)
 
-        if msg.lower() == "disconnected":
+        '''
+        if type(msg) is str and msg.lower() == "disconnected":
             conn.close()
+            print("Disconnected")
             break
-        else:
-            segment = msg.split()
-            if len(segment) != 2:
-                print("Message format invalid. Please resend valid message to get model")
-            else:
-                pass
+        '''
+        if isinstance(msg, list):
+            # print(msg)
+            task = msg[0]
+            frame = msg[1]
+            ans = model_dict.get_model('deploy_ssd_mobilenet_512').parseResult(task, 
+                                        model_dict.get_model('deploy_ssd_mobilenet_512').doInference(frame))
+            conn.send(ans)
+        
+        conn.close()
 
     listener.close()
 

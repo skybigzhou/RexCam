@@ -50,11 +50,7 @@ def _semantic_check_and_run(args):
     framework = args.framework
     model_path = args.modelPath
     source = str(args.source)
-    if args.nickName:
-        nickname = args.nickName
-    else:
-        nickname = "User_Model_0"
-
+    
     if "." in model_path:
         reply = raw_input("WARNING: file suffix should not be included, would you like to continue(y/n): ")
         if not (reply.lower() == "y" or reply.lower() == "yes"):
@@ -73,9 +69,13 @@ def _semantic_check_and_run(args):
 
     elif args.framework == "intel_mo_IR":
         try:
-            inference.intel_process(task, str(model_path + ".xml"), source, nickname)
-        except Exception:
-            print("Error: Task Not Clarified")
+            if args.nickName:
+                inference.intel_process(task, str(model_path + ".xml"), source, str(args.nickName))
+            else:
+                inference.intel_process(task, str(model_path + ".xml"), source)
+
+        except Exception as ex:
+            print("Exception {}".format(ex))
 
     #TODO: convert input label file
     if args.labelPath:

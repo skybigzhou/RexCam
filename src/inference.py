@@ -2,6 +2,7 @@ from localDisplay import LocalDisplay
 from wrapper import VideoCapture
 from videoFrameStack import LocalSave
 from modelManagement import *
+from multiprocessing.connection import Client
 import os
 import json
 import time
@@ -11,6 +12,14 @@ import cv2
 
 def model_switch():
     pass
+
+
+def parse_to_modelManagement(task, frame):
+    conn = Client(local_address, authkey = 'localModel')
+    conn.send([task, frame])
+    results = conn.recv()
+    conn.close()
+    return results
 
 
 # TODO: parse the input size, remove the model_path
@@ -34,8 +43,9 @@ def intel_process(task, model_path, source, nickname='deploy_ssd_mobilenet_512')
         # Create a local display instance that will dump the image bytes to a FIFO
         # file that the image can be rendered locally.
         
-        local_display = LocalDisplay('480p', 'results.mjpeg')
-        local_display.start()
+        # Starting Local Display for demo
+        # local_display = LocalDisplay('480p', 'results.mjpeg')
+        # local_display.start()
         
         controller = "/home/aws_cam/Desktop/controller.txt"
         f = open(controller, "w")
@@ -46,14 +56,24 @@ def intel_process(task, model_path, source, nickname='deploy_ssd_mobilenet_512')
         detection_threshold = 0.25
         # The height and width of the training set images
         input_dict = dict()
+        print(nickname)
         input_dict[nickname] = (512, 512)
         input_dict['mxnet_resnet50'] = (300, 300)
         
         # Do inference until the lambda is killed.
         
         cap = VideoCapture(source)
+        
         while True:
-            
+            '''
+            local_start_time = time.time()
+            if (time.time() - local_start_time > 3*60):
+                print("Inference Timeout")
+                conn.send("disconnected")
+                conn.close()
+                break
+            '''
+
             # Get a frame from the video stream
             start_time = time.time()
             ret, frame = cap.readLastFrame()
@@ -83,14 +103,17 @@ def intel_process(task, model_path, source, nickname='deploy_ssd_mobilenet_512')
                 frame_resize = cv2.resize(frame, input_dict[nickname])
 
                 # Change the model inference API by send frame to model Management
-
+                '''
+                AWSCAM API
                 parsed_inference_results = model.parseResult(task,
                                                              model.doInference(frame_resize))
-
+                '''
+                parsed_inference_results = parse_to_modelManagement(task, frame_resize)
+                
                 # Compute the scale in order to draw bounding boxes on the full resolution
                 # image.
-                yscale = float(frame.shape[0])/input_dict[model_switch][0]
-                xscale = float(frame.shape[1])/input_dict[model_switch][1]
+                yscale = float(frame.shape[0])/input_dict[nickname][0]
+                xscale = float(frame.shape[1])/input_dict[nickname][1]
                 # Dictionary to be filled with labels and probabilities for MQTT
                 cloud_output = {}
                 # Get the detected objects and probabilities
@@ -121,7 +144,7 @@ def intel_process(task, model_path, source, nickname='deploy_ssd_mobilenet_512')
                         cloud_output[output_map[obj['label']]] = obj['prob']
             # Set the next frame in the local display stream.
             cv2.putText(frame, "FPS: {:.2f}".format(1.0 / (time.time() - start_time)), (10, 50), cv2.FONT_HERSHEY_SIMPLEX, yscale, (255, 165, 20), int(yscale*2))
-            local_display.set_frame_data(frame)
+            # local_display.set_frame_data(frame)
             # Send results to the cloud
             if (not anaytics_switch):
                 pass
@@ -129,7 +152,7 @@ def intel_process(task, model_path, source, nickname='deploy_ssd_mobilenet_512')
                 print(json.dumps(cloud_output), time.time() - start_time)
             
     except Exception as ex:
-        raise Exception
+        print(ex)
 
 
 def mxnet_process(model_path, weight_path):
