@@ -1,6 +1,7 @@
 from localDisplay import LocalDisplay
 from wrapper import VideoCapture
 from videoFrameStack import LocalSave
+from modelManagement import *
 import os
 import json
 import time
@@ -8,12 +9,12 @@ import numpy as np
 import cv2
 
 
-def set_up(source):
-    cap = VideoCapture(source)
-    return cap
+def model_switch():
+    pass
 
 
-def intel_process(task, model_path, source, nickname):
+# TODO: parse the input size, remove the model_path
+def intel_process(task, model_path, source, nickname='deploy_ssd_mobilenet_512'):
     try:
         import awscam
     except ImportError:
@@ -36,30 +37,11 @@ def intel_process(task, model_path, source, nickname):
         local_display = LocalDisplay('480p', 'results.mjpeg')
         local_display.start()
         
-        # Separate Data Management with Logic Script
-        '''
-        if source == "AWSCAM" or source == "WEBCAM":
-            print("Auto Save Start")
-            auto_save = LocalSave(source)
-            auto_save.start()
-        '''
-
-        # Load the model onto the GPU.
-        
-        print("Loading Model ...")
-        start_time = time.time()
-        model_dict = dict()
-        model_dict[nickname] = awscam.Model(model_path, {'GPU': 1})
-        
         controller = "/home/aws_cam/Desktop/controller.txt"
         f = open(controller, "w")
         f.write(nickname)
         f.close()
 
-        new_model_path = '/opt/awscam/artifacts/mxnet_deploy_ssd_resnet50_300_FP16_FUSED.xml'
-        model_dict['mxnet_resnet50'] = awscam.Model(new_model_path, {'GPU': 1})
-        print("Intel Pre-trained Object Detection Model Loaded. Time Cost: {}".format(time.time() - start_time))
-        
         # Set the threshold for detection
         detection_threshold = 0.25
         # The height and width of the training set images
@@ -69,7 +51,7 @@ def intel_process(task, model_path, source, nickname):
         
         # Do inference until the lambda is killed.
         
-        cap = set_up(source)
+        cap = VideoCapture(source)
         while True:
             
             # Get a frame from the video stream
@@ -83,17 +65,28 @@ def intel_process(task, model_path, source, nickname):
             if (not anaytics_switch):
                 pass
             else:
+                '''
                 f = open(controller, "r")
                 model_switch = str(f.readline().rstrip())
                 if model_switch not in model_dict.keys():
                     model_switch = 'mxnet_resnet50'
+                '''
+
+                # Rewrite model switch pattern
+                # model = model_switch()
+
                 # Run the images through the inference engine and parse the results using
                 # the parser API, note it is possible to get the output of doInference
                 # and do the parsing manually, but since it is a ssd model,
                 # a simple API is provided.
-                frame_resize = cv2.resize(frame, input_dict[model_switch])
-                parsed_inference_results = model_dict[model_switch].parseResult(task,
-                                                             model_dict[model_switch].doInference(frame_resize))
+
+                frame_resize = cv2.resize(frame, input_dict[nickname])
+
+                # Change the model inference API by send frame to model Management
+
+                parsed_inference_results = model.parseResult(task,
+                                                             model.doInference(frame_resize))
+
                 # Compute the scale in order to draw bounding boxes on the full resolution
                 # image.
                 yscale = float(frame.shape[0])/input_dict[model_switch][0]
@@ -136,7 +129,7 @@ def intel_process(task, model_path, source, nickname):
                 print(json.dumps(cloud_output), time.time() - start_time)
             
     except Exception as ex:
-        print(ex)
+        raise Exception
 
 
 def mxnet_process(model_path, weight_path):
