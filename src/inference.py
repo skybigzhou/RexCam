@@ -14,9 +14,9 @@ def model_switch():
     pass
 
 
-def parse_to_modelManagement(task, frame):
+def parse_to_modelManagement(task, frame, nickname):
     conn = Client(local_address, authkey = 'localModel')
-    conn.send([task, frame])
+    conn.send([task, frame, nickname])
     results = conn.recv()
     conn.close()
     return results
@@ -65,43 +65,29 @@ def intel_process(task, model_path, source, nickname='deploy_ssd_mobilenet_512')
         cap = VideoCapture(source)
         
         while True:
-            '''
-            local_start_time = time.time()
-            if (time.time() - local_start_time > 3*60):
-                print("Inference Timeout")
-                conn.send("disconnected")
-                conn.close()
-                break
-            '''
-
             # Get a frame from the video stream
             start_time = time.time()
             ret, frame = cap.readLastFrame()
             if not ret:
                 raise Exception('Failed to get frame from the stream')
-            # Resize frame to the same size as the training set.
-            
+
             anaytics_switch = os.path.isfile(controller)
             if (not anaytics_switch):
+                # Switch off
                 pass
             else:
-                '''
+                # Switch on
+                # Model switch pattern
                 f = open(controller, "r")
-                model_switch = str(f.readline().rstrip())
-                if model_switch not in model_dict.keys():
-                    model_switch = 'mxnet_resnet50'
-                '''
+                nickname = str(f.readline().rstrip())
 
-                # Rewrite model switch pattern
-                # model = model_switch()
+                # Resize frame to the same size as the training set.
+                frame_resize = cv2.resize(frame, input_dict[nickname])
 
                 # Run the images through the inference engine and parse the results using
                 # the parser API, note it is possible to get the output of doInference
                 # and do the parsing manually, but since it is a ssd model,
                 # a simple API is provided.
-
-                frame_resize = cv2.resize(frame, input_dict[nickname])
-
                 # Change the model inference API by send frame to model Management
                 '''
                 AWSCAM API
@@ -150,7 +136,7 @@ def intel_process(task, model_path, source, nickname='deploy_ssd_mobilenet_512')
                 pass
             else:
                 print(json.dumps(cloud_output), time.time() - start_time)
-            
+
     except Exception as ex:
         print(ex)
 

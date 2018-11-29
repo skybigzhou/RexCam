@@ -69,41 +69,19 @@ class LocalSave(Thread):
             while not self.stop_request.isSet():
                 
                 time.sleep(self.timeout)
-                command = Command("cp /home/aws_cam/Desktop/local_video/out.h264 /home/aws_cam/Desktop/local_video/tmp_{1}.h264".format(
-                                self.timeout, self.counter), "tmp_{}.h264".format(self.counter))
-
+                command = Command("cp /home/aws_cam/Desktop/local_video/out.h264 /home/aws_cam/Desktop/local_video/tmp_{}.h264".format(self.counter), 
+                                    "tmp_{}.h264".format(self.counter))
                 command.run()
+
+                # Remove the redundant data
+                if self.counter > 0:
+                    command = Command("rm /home/aws_cam/Desktop/local_video/tmp_{}.h264".format(self.counter - 1))
+                    command.run()
                 
                 self.counter += 1
-                
 
-                '''
-                if self.last_command:
-                    self.last_command.join(self.overlap)
-                    self.counter += 1
-                    self.last_command = command
-                    time.sleep(self.timeout - self.overlap * 2)
-                else:
-                    self.counter += 1
-                    self.last_command = command
-                    time.sleep(self.timeout - self.overlap)
-                '''
         else:
             raise NotImplementedError("WEBCAM is not supported for local save yet")
-
-
-        '''
-        while not self.stop_request.isSet():
-            ret, frame = awscam.getLastFrame()
-            # timestamp = datetime.utcnow().strftime('%Y-%m-%d-%H:%M:%S-%f')[:-3]
-            timestamp = time.time()
-            
-            if not ret:
-                raise Exception('Failed to get frame from the stream')
-
-            # cv2.putText(frame, "FPS: {:.2f}".format(1.0 / (time.time() - start_time)), (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 2.5, (255, 165, 20), 6)
-            local_save.set_frame_data(frame, timestamp)
-        '''
 
 
     def stop(self, timeout):

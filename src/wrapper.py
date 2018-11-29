@@ -55,7 +55,6 @@ class VideoCapture():
         '''
 
         # READ FROM AWSCAM OR WEBCAM
-        
         if self.source == "AWSCAM":
             import awscam
             ret, frame = awscam.getLastFrame()

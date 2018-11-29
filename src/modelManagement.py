@@ -3,17 +3,24 @@ import argparse
 import os
 import time
 import pprint
+from socket_utils import *
 try:
     import awscam
 except ImportError:
     print("WARNING: AWSCAM is not available in this device")
 from multiprocessing.connection import Listener, Client
+import socket
 from threading import Thread
 
 global local_address
 local_address = ('localhost', 6000)
+model_dir = "/opt/awscam/artifacts"
 
-
+'''
+Model_Dict (key, value):
+key = model's nickname for switch model
+value = (model_path, awscam.Model)
+'''
 class Model_Dict(object):
 
     def __init__(self):
@@ -37,6 +44,10 @@ class Model_Dict(object):
 model_dict = Model_Dict()
 
 
+'''
+Starting Service with parsing all the local model path you
+want to deploy into GPU
+'''
 def _get_parser():
     parser = argparse.ArgumentParser(description="Start Model Management- A preload model pool for user model switch")
 
@@ -49,8 +60,11 @@ def _get_parser():
     return parser
 
 
-def preload_models(args):
-    models_path = args.models_path
+'''
+Preload declared model into GPU, and update metadata with
+append "model_dict[nickname] = (model_path, model)"
+'''
+def preload_models(models_path):
     models_num = len(models_path)
 
     for i in xrange(models_num):
@@ -65,6 +79,60 @@ def preload_models(args):
             print(ex)
 
 
+'''
+Listener used for model migration to remote device in 
+distributed model management system.
+'''
+def remote_listener():
+    server = create_server_socket()
+
+    def handle_client_connection(conn):
+        name = conn.recv(1024)
+        print("Receive request for {}".format(name))
+        
+        #TODO: get model_path from metadata
+        model_path = os.path.join(model_dir, name + ".xml")       
+        #TODO: check send model
+        send_file(conn, model_path)
+        #TODO: update metadata
+
+        conn.send('ACK')
+        conn.close()
+
+    while True:
+        conn, address = server.accept()
+        print("Accept connection from {}:{}".format(address[0], address[1]))
+        client_handler = Thread(target = handle_client_connection, args = (conn,), name = "remoteListenerWorker")
+        client_handler.start()
+
+
+'''
+Fetch remote model through local router
+'''
+def fetch_remote_model(nickname):
+    #TODO: address = ?
+    ip = 'localhost'
+    conn = create_client_socket(ip)
+    conn.send(nickname)
+
+    #TODO: check file recv
+    model_path = os.path.join(model_dir, nickname + ".xml")
+    recv_file(conn, model_path)
+
+    response = conn.recv(1024)
+    if response == "ACK":
+        print("Receive ACK from remote")
+        conn.close()
+
+    preload_models(model_path)
+
+    #TODO: broadcast metadata update and self metadata update
+
+
+'''
+Local listener, receive message(data) from Application 
+Layer and send back the inference results.
+'''
 def local_listener():
     listener = Listener(local_address, authkey="localModel")
     while True:
@@ -73,32 +141,49 @@ def local_listener():
         msg = conn.recv()
         print(msg)
 
-        '''
-        if type(msg) is str and msg.lower() == "disconnected":
-            conn.close()
-            print("Disconnected")
-            break
-        '''
-        if isinstance(msg, list):
-            # print(msg)
-            task = msg[0]
-            frame = msg[1]
-            ans = model_dict.get_model('deploy_ssd_mobilenet_512').parseResult(task, 
-                                        model_dict.get_model('deploy_ssd_mobilenet_512').doInference(frame))
-            conn.send(ans)
-        
+        assert isinstance(msg, list) and len(msg) == 3
+        task = msg[0]
+        frame = msg[1]
+        nickname = msg[2]
+        if nickname not in model_dict.get_all_dict().keys():
+            t_tmp = Thread(target=fetch_remote_model, args=(nickname,), name="tmpDeployRemoteModel")
+            t_tmp.start()
+            # Use Default Model
+            print("Model not found at local, fetch from remote, switch to default model")
+            nickname = 'deploy_ssd_mobilenet_512'
+
+        ans = model_dict.get_model(nickname).parseResult(task, 
+                                    model_dict.get_model(nickname).doInference(frame))
+        conn.send(ans)
         conn.close()
 
     listener.close()
 
 
+'''
+Service Main Function
+'''
 def main():
     parser = _get_parser()
     args = parser.parse_args()
-    preload_models(args)
+    models_path = args.models_path
+    
+    # Start preload default model
+    preload_models(models_path)
 
-    t = Thread(target=local_listener, name="ListenerThread")
-    t.start()
+    # Start a thread hearing from local application layer
+    t_local = Thread(target=local_listener, name="localListener")
+    t_local.start()
+
+    # Start a thread hearing from remote devices
+    t_remote = Thread(target=remote_listener, name="remoteListener")
+    t_remote.start()
+
+    # Set service timeout default 10 * 60
+    timeout = 10 * 60
+    time.sleep(timeout)
+    t_local.join()
+    t_remote.join()
 
 
 if __name__=="__main__":
