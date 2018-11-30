@@ -44,8 +44,8 @@ def intel_process(task, model_path, source, nickname='deploy_ssd_mobilenet_512')
         # file that the image can be rendered locally.
         
         # Starting Local Display for demo
-        # local_display = LocalDisplay('480p', 'results.mjpeg')
-        # local_display.start()
+        local_display = LocalDisplay('480p', 'results.mjpeg')
+        local_display.start()
         
         controller = "/home/aws_cam/Desktop/controller.txt"
         f = open(controller, "w")
@@ -56,9 +56,8 @@ def intel_process(task, model_path, source, nickname='deploy_ssd_mobilenet_512')
         detection_threshold = 0.25
         # The height and width of the training set images
         input_dict = dict()
-        print(nickname)
-        input_dict[nickname] = (512, 512)
-        input_dict['mxnet_resnet50'] = (300, 300)
+        input_dict['deploy_ssd_mobilenet_512'] = (512, 512)
+        input_dict['mxnet_deploy_ssd_resnet50_300_FP16_FUSED'] = (300, 300)
         
         # Do inference until the lambda is killed.
         
@@ -94,7 +93,7 @@ def intel_process(task, model_path, source, nickname='deploy_ssd_mobilenet_512')
                 parsed_inference_results = model.parseResult(task,
                                                              model.doInference(frame_resize))
                 '''
-                parsed_inference_results = parse_to_modelManagement(task, frame_resize)
+                parsed_inference_results = parse_to_modelManagement(task, frame_resize, nickname)
                 
                 # Compute the scale in order to draw bounding boxes on the full resolution
                 # image.
@@ -125,12 +124,12 @@ def intel_process(task, model_path, source, nickname='deploy_ssd_mobilenet_512')
                         cv2.putText(frame, "{}: {:.2f}%".format(output_map[obj['label']],
                                                                    obj['prob'] * 100),
                                     (xmin, ymin-text_offset),
-                                    cv2.FONT_HERSHEY_SIMPLEX, yscale, (255, 165, 20), int(yscale*2))
+                                    cv2.FONT_HERSHEY_SIMPLEX, 2.5, (255, 165, 20), 6)
                         # Store label and probability to send to cloud
                         cloud_output[output_map[obj['label']]] = obj['prob']
             # Set the next frame in the local display stream.
-            cv2.putText(frame, "FPS: {:.2f}".format(1.0 / (time.time() - start_time)), (10, 50), cv2.FONT_HERSHEY_SIMPLEX, yscale, (255, 165, 20), int(yscale*2))
-            # local_display.set_frame_data(frame)
+            cv2.putText(frame, "FPS: {:.2f}".format(1.0 / (time.time() - start_time)), (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 2.5, (255, 165, 20), 6)
+            local_display.set_frame_data(frame)
             # Send results to the cloud
             if (not anaytics_switch):
                 pass

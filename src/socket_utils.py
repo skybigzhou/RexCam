@@ -6,18 +6,19 @@ import os
 import thread
 import commands
 
-
+'''
 def return_local_ip():
 	s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 	s.connect(('8.8.8.8', 80))
 	return s.getsockname()[0]
-
+'''
 
 def send_file(conn, model_path):
 	try:
 		assert os.path.isfile(model_path)
 		fileinfo_size = struct.calcsize('128sl')
 
+		print(os.path.basename(model_path))
 		fhead = struct.pack('128sl', os.path.basename(model_path), os.stat(model_path).st_size)
 		conn.send(fhead)
 		
@@ -60,9 +61,12 @@ def recv_file(conn, model_path):
 
 def create_server_socket():
 	s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-	host = return_local_ip()
 	port = 5555
+	'''
+	host = return_local_ip()
 	s.bind((host, port))
+	'''
+	s.bind(('', port))
 	s.listen(5)
 	return s
 

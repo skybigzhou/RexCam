@@ -73,10 +73,10 @@ class LocalSave(Thread):
                                     "tmp_{}.h264".format(self.counter))
                 command.run()
 
-                # Remove the redundant data
-                if self.counter > 0:
-                    command = Command("rm /home/aws_cam/Desktop/local_video/tmp_{}.h264".format(self.counter - 1))
-                    command.run()
+                # # Remove the redundant data
+                # if self.counter > 0:
+                #     command = Command("rm /home/aws_cam/Desktop/local_video/tmp_{}.h264".format(self.counter - 1))
+                #     command.run()
                 
                 self.counter += 1
 

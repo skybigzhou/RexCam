@@ -14,7 +14,10 @@ from threading import Thread
 
 global local_address
 local_address = ('localhost', 6000)
+
+# Local Test Dir
 model_dir = "/opt/awscam/artifacts"
+remote_dir = "/home/aws_cam/Desktop/remote_model"
 
 '''
 Model_Dict (key, value):
@@ -91,15 +94,18 @@ def remote_listener():
         print("Receive request for {}".format(name))
         
         #TODO: get model_path from metadata
-        model_path = os.path.join(model_dir, name + ".xml")       
+        model_path = os.path.join(model_dir, name + ".xml")  
+        param_path = os.path.join(model_dir, name + ".bin")     
         #TODO: check send model
         send_file(conn, model_path)
+        send_file(conn, param_path)
         #TODO: update metadata
 
         conn.send('ACK')
         conn.close()
 
     while True:
+        print("Remote Listener start listening")
         conn, address = server.accept()
         print("Accept connection from {}:{}".format(address[0], address[1]))
         client_handler = Thread(target = handle_client_connection, args = (conn,), name = "remoteListenerWorker")
@@ -116,15 +122,17 @@ def fetch_remote_model(nickname):
     conn.send(nickname)
 
     #TODO: check file recv
-    model_path = os.path.join(model_dir, nickname + ".xml")
+    model_path = os.path.join(remote_dir, nickname + ".xml")
+    param_path = os.path.join(remote_dir, nickname + ".bin")
     recv_file(conn, model_path)
+    recv_file(conn, param_path)
 
     response = conn.recv(1024)
     if response == "ACK":
         print("Receive ACK from remote")
         conn.close()
 
-    preload_models(model_path)
+    preload_models([model_path])
 
     #TODO: broadcast metadata update and self metadata update
 
@@ -139,18 +147,21 @@ def local_listener():
         conn = listener.accept()
         print("connection accepted from", listener.last_accepted)        
         msg = conn.recv()
-        print(msg)
+        # print(msg)
 
         assert isinstance(msg, list) and len(msg) == 3
         task = msg[0]
         frame = msg[1]
         nickname = msg[2]
         if nickname not in model_dict.get_all_dict().keys():
+            '''
             t_tmp = Thread(target=fetch_remote_model, args=(nickname,), name="tmpDeployRemoteModel")
             t_tmp.start()
             # Use Default Model
             print("Model not found at local, fetch from remote, switch to default model")
             nickname = 'deploy_ssd_mobilenet_512'
+            '''
+            fetch_remote_model(nickname)
 
         ans = model_dict.get_model(nickname).parseResult(task, 
                                     model_dict.get_model(nickname).doInference(frame))

@@ -2,6 +2,7 @@ import sys
 import argparse
 import os
 from videoFrameStack import LocalSave
+from threading import Thread, Event
 from six import text_type as _text_type
 
 
@@ -36,6 +37,9 @@ def _get_parser():
     return parser
 
 
+
+
+
 def start_data_management(args):
     chunk_timeout = args.cTimeout
     timeout = args.totalTimeout
@@ -47,10 +51,17 @@ def start_data_management(args):
     else:
         print("Data Management Local Save Starting ...")
 
-    data_management = LocalSave(source, timeout, chunk_timeout, overlap)
-    data_management.start()
+    local_save = LocalSave(source, timeout, chunk_timeout, overlap)
+    local_save.start()
 
-    data_management.stop(timeout)
+    t_local = Thread(target=)
+    t_local.start()
+    t_remote = 
+    t_remote.start()
+
+    local_save.stop(timeout)
+    t_local.join()
+    t_remote.join()
 
 
 def main():
