@@ -7,15 +7,16 @@ import time
 import numpy as np
 import cv2
 
-
+'''
 def _get_index(start_time, fps, timeout, duration):
     chunk_idx = int((start_time + duration) / timeout) + 1
     frame_idx = fps* start_time
     print("Loading from video tmp_{0}.h264 from frame {1} to frame {2}".format(chunk_idx, frame_idx+1, (start_time+duration)*fps))
 
     return chunk_idx, frame_idx
+'''
 
-
+#TODO: change the inference logic for local after change API
 def inference_local(startTime, duration, model_path, source, nickname, task):
     try:
         import awscam

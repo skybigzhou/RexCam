@@ -12,8 +12,8 @@ from multiprocessing.connection import Listener, Client
 import socket
 from threading import Thread
 
-global local_address
-local_address = ('localhost', 6000)
+global local_address_m
+local_address_m = ('localhost', 6000)
 
 # Local Test Dir
 model_dir = "/opt/awscam/artifacts"
@@ -142,10 +142,10 @@ Local listener, receive message(data) from Application
 Layer and send back the inference results.
 '''
 def local_listener():
-    listener = Listener(local_address, authkey="localModel")
+    listener = Listener(local_address_m, authkey="localModel")
     while True:
         conn = listener.accept()
-        print("connection accepted from", listener.last_accepted)        
+        print("[Model] connection accepted from", listener.last_accepted)        
         msg = conn.recv()
         # print(msg)
 

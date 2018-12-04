@@ -18,10 +18,11 @@ class Command(object):
 
     def run(self):
         def h264Save():
+            start_time = time.time()
             print("Start Saving in a New Video Stream {}".format(self.name))
             self.process = subprocess.Popen(self.cmd, shell=True)
             self.process.communicate()
-            print("Saving Ended {}".format(self.name))
+            print("Saving Ended {}".format(self.name), time.time() - start_time)
 
         self.thread = Thread(target = h264Save)
         self.thread.start()
@@ -69,8 +70,7 @@ class LocalSave(Thread):
             while not self.stop_request.isSet():
                 
                 time.sleep(self.timeout)
-                command = Command("cp /home/aws_cam/Desktop/local_video/out.h264 /home/aws_cam/Desktop/local_video/tmp_{}.h264".format(self.counter), 
-                                    "tmp_{}.h264".format(self.counter))
+                command = Command("cp /home/aws_cam/Desktop/local_video/out.h264 /home/aws_cam/Desktop/local_video/local.h264", "local.h264")
                 command.run()
 
                 # # Remove the redundant data
@@ -78,12 +78,12 @@ class LocalSave(Thread):
                 #     command = Command("rm /home/aws_cam/Desktop/local_video/tmp_{}.h264".format(self.counter - 1))
                 #     command.run()
                 
-                self.counter += 1
+                # self.counter += 1 
 
         else:
             raise NotImplementedError("WEBCAM is not supported for local save yet")
 
 
     def stop(self, timeout):
-        time.sleep(timeout)
+        time.sleep(timeout+5)
         self.stop_request.set()

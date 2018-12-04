@@ -1,9 +1,18 @@
 import sys
 import argparse
 import os
+import cv2
 from videoFrameStack import LocalSave
 from threading import Thread, Event
 from six import text_type as _text_type
+from multiprocessing.connection import Listener, Client
+import socket
+from socket_utils import *
+
+global local_address_d
+local_address_d = ('localhost', 6001)
+
+local_dir = "/home/aws_cam/Desktop/local_video"
 
 
 def _get_parser():
@@ -19,7 +28,7 @@ def _get_parser():
     parser.add_argument(
         "--cTimeout", "-c",
         type=int,
-        default=60,
+        default=10,
         help="Timeout for saving video stream in a chunk")
 
     parser.add_argument(
@@ -37,7 +46,45 @@ def _get_parser():
     return parser
 
 
+def local_listener():
+    listener = Listener(local_address_d, authkey="localData")
+    while True:
+        conn = listener.accept()
+        print("[DATA] connection accepted from", listener.last_accepted)
+        msg = conn.recv()
 
+        # TODO: check end validation
+        assert isinstance(msg, list) and len(msg) == 4
+        video_id = msg[0]
+        begin = msg[1]
+        end = msg[2]
+        fps = msg[3] # Recently fps can only be 24
+
+        if not video_id == "local.h264":
+            raise NotImplementedError("Cannot fetch data from remote")
+
+        cap = cv2.VideoCapture(os.path.join(local_dir, video_id))
+        frame_id = begin * fps
+        ret = cap.set(1, frame_id)
+
+        if begin == end:
+            ret, frame = cap.read()
+            conn.send([frame])
+            conn.close()
+        else:
+            frame_list = list()
+            for i in xrange((end-begin)*fps):
+                ret, frame = cap.read()
+                frame_list.append(frame)
+
+            conn.send(frame_list)
+            conn.close()
+
+    listener.close()
+
+
+def remote_listener():
+    pass
 
 
 def start_data_management(args):
@@ -54,15 +101,17 @@ def start_data_management(args):
     local_save = LocalSave(source, timeout, chunk_timeout, overlap)
     local_save.start()
 
-    t_local = Thread(target=)
+    '''
+    t_local = Thread(target=local_listener, name="localListenerData")
     t_local.start()
-    t_remote = 
+    t_remote = Thread(target=remote_listener, name="remoteListenerData")
     t_remote.start()
-
+    '''
     local_save.stop(timeout)
+    '''
     t_local.join()
     t_remote.join()
-
+    '''
 
 def main():
     parser = _get_parser()

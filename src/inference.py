@@ -1,7 +1,7 @@
 from localDisplay import LocalDisplay
 from wrapper import VideoCapture
 from videoFrameStack import LocalSave
-from modelManagement import *
+from modelManagement import local_address_m
 from multiprocessing.connection import Client
 import os
 import json
@@ -10,12 +10,9 @@ import numpy as np
 import cv2
 
 
-def model_switch():
-    pass
-
-
 def parse_to_modelManagement(task, frame, nickname):
-    conn = Client(local_address, authkey = 'localModel')
+    global local_address_m
+    conn = Client(local_address_m, authkey = 'localModel')
     conn.send([task, frame, nickname])
     results = conn.recv()
     conn.close()

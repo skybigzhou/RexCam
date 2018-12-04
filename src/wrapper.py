@@ -2,6 +2,18 @@ import cv2
 import time
 import json
 import os
+from dataManagement import local_address_d
+from multiprocessing.connection import Client
+
+
+def parse_framelist(video_id, begin, end, fps):
+    global local_address_d
+    conn = Client(local_address_d, authkey="localData")
+    conn.send([video_id, begin, end])
+    framelist = conn.recv()
+    conn.close()
+    return framelist
+
 
 class VideoCapture():
     """
@@ -19,17 +31,26 @@ class VideoCapture():
         # raise NotImplementedError("Constructor Not Implemented Yet")
 
 
-    def readFrameByTime(self, timestamp):
+    def readFrameByTime(self, timestamp, fps, video_id):
+        '''
         idx = int(timestamp - self.start_time)
         self.cap.set(1, idx)
         ret, frame = self.cap.read()
 
         return (ret, frame)
+        '''
 
-        raise NotImplementedError("Read Frame Through Timestamp Not Implemented Yet")
+        framelist = parse_framelist(video_id, timestamp, timestamp, fps)
+        if len(framelist) == 1:
+            return True, framelist[0]
+        else:
+            return False, None
+
+        # raise NotImplementedError("Read Frame Through Timestamp Not Implemented Yet")
 
 
-    def readFrameByPeriod(self, begin, end, fps):
+    def readFrameByPeriod(self, begin, end, fps, video_id):
+        '''
         idx_b = int(begin - self.start_time)
         idx_e = int(end - self.start_time)
         ret_frame = []
@@ -43,6 +64,10 @@ class VideoCapture():
                 ret_frame.append(frame)
 
         return (ret, ret_frame)
+        '''
+
+        framelist = parse_framelist(video_id, begin, end, fps)
+        return True, framelist
 
         raise NotImplementedError("Read Frame Through Time Period Not Implemented Yet")
 
