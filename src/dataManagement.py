@@ -13,6 +13,7 @@ global local_address_d
 local_address_d = ('localhost', 6001)
 
 local_dir = "/home/aws_cam/Desktop/local_video"
+remote_dir = "/home/aws_cam/Desktop/remote_video"
 
 
 def _get_parser():
@@ -46,6 +47,53 @@ def _get_parser():
     return parser
 
 
+#TODO: shorten the sending data
+def min_send_data(name):
+    return name
+
+
+def remote_listener():
+    server = create_server_socket()
+
+    def handle_client_connection(conn):
+        video_id = conn.recv(1024)
+        print("Receive request for {}".format(video_id))
+
+        #TODO: get model_path from metadata
+        data = min_send_data(video_id)
+        data_path = os.path.join(local_dir, video_id)
+        #TODO: check send model
+
+        send_file(conn, data_path)
+        #TODO: update metadata
+
+        conn.send('ACK')
+        conn.close()
+
+    while True:
+        print("[DATA] Remote Listener start listening")
+        conn, address = server.accept()
+        print("Accept connection from {}:{}".format(address[0], address[1]))
+        client_handler = Thread(target=handle_client_connection, args=(conn,), name= "remoteListenerDataWorker")
+        client_handler.start()
+
+
+def fetch_remote_model(video_id):
+    #TODO: address = ?
+    ip = 'localhost'
+    conn = create_client_socket(ip)
+    conn.send(video_id)
+
+    #TODO: check file recv
+    data_path = os.path.join(remote_dir, video_id)
+    recv_file(conn, data_path)
+    
+    response = conn.recv(1024)
+    if response == "ACK":
+        print("Receive ACK from remote")
+        conn.close()
+
+
 def local_listener():
     listener = Listener(local_address_d, authkey="localData")
     while True:
@@ -61,7 +109,7 @@ def local_listener():
         fps = msg[3] # Recently fps can only be 24
 
         if not video_id == "local.h264":
-            raise NotImplementedError("Cannot fetch data from remote")
+            fetch_remote_data(video_id)
 
         cap = cv2.VideoCapture(os.path.join(local_dir, video_id))
         frame_id = begin * fps
@@ -83,10 +131,6 @@ def local_listener():
     listener.close()
 
 
-def remote_listener():
-    pass
-
-
 def start_data_management(args):
     chunk_timeout = args.cTimeout
     timeout = args.totalTimeout
@@ -101,17 +145,16 @@ def start_data_management(args):
     local_save = LocalSave(source, timeout, chunk_timeout, overlap)
     local_save.start()
 
-    '''
     t_local = Thread(target=local_listener, name="localListenerData")
     t_local.start()
     t_remote = Thread(target=remote_listener, name="remoteListenerData")
     t_remote.start()
-    '''
+
     local_save.stop(timeout)
-    '''
+
     t_local.join()
     t_remote.join()
-    '''
+
 
 def main():
     parser = _get_parser()

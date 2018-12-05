@@ -105,7 +105,7 @@ def remote_listener():
         conn.close()
 
     while True:
-        print("Remote Listener start listening")
+        print("[MODEL] Remote Listener start listening")
         conn, address = server.accept()
         print("Accept connection from {}:{}".format(address[0], address[1]))
         client_handler = Thread(target = handle_client_connection, args = (conn,), name = "remoteListenerWorker")
@@ -145,7 +145,7 @@ def local_listener():
     listener = Listener(local_address_m, authkey="localModel")
     while True:
         conn = listener.accept()
-        print("[Model] connection accepted from", listener.last_accepted)        
+        print("[MODEL] connection accepted from", listener.last_accepted)        
         msg = conn.recv()
         # print(msg)
 

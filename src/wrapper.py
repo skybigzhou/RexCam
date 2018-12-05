@@ -6,7 +6,7 @@ from dataManagement import local_address_d
 from multiprocessing.connection import Client
 
 
-def parse_framelist(video_id, begin, end, fps):
+def parse_frame_list(video_id, begin, end, fps):
     global local_address_d
     conn = Client(local_address_d, authkey="localData")
     conn.send([video_id, begin, end])
@@ -40,7 +40,7 @@ class VideoCapture():
         return (ret, frame)
         '''
 
-        framelist = parse_framelist(video_id, timestamp, timestamp, fps)
+        framelist = parse_frame_list(video_id, timestamp, timestamp, fps)
         if len(framelist) == 1:
             return True, framelist[0]
         else:
@@ -66,7 +66,7 @@ class VideoCapture():
         return (ret, ret_frame)
         '''
 
-        framelist = parse_framelist(video_id, begin, end, fps)
+        framelist = parse_frame_list(video_id, begin, end, fps)
         return True, framelist
 
         raise NotImplementedError("Read Frame Through Time Period Not Implemented Yet")
