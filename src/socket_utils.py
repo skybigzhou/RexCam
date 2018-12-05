@@ -59,20 +59,20 @@ def recv_file(conn, model_path):
 		file.close()
 		
 
-def create_server_socket():
+def create_server_socket(mode):
 	s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-	port = 5555
+	port = [5555, 6666]
 	'''
 	host = return_local_ip()
 	s.bind((host, port))
 	'''
-	s.bind(('', port))
+	s.bind(('', port[mode]))
 	s.listen(5)
 	return s
 
 
-def create_client_socket(ip):
+def create_client_socket(ip, mode):
 	s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-	port = 5555
-	s.connect((ip, port))
+	port = [5555, 6666]
+	s.connect((ip, port[mode]))
 	return s

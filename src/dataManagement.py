@@ -53,7 +53,7 @@ def min_send_data(name):
 
 
 def remote_listener():
-    server = create_server_socket()
+    server = create_server_socket(1)
 
     def handle_client_connection(conn):
         video_id = conn.recv(1024)
@@ -78,10 +78,10 @@ def remote_listener():
         client_handler.start()
 
 
-def fetch_remote_model(video_id):
+def fetch_remote_data(video_id):
     #TODO: address = ?
     ip = 'localhost'
-    conn = create_client_socket(ip)
+    conn = create_client_socket(ip, 1)
     conn.send(video_id)
 
     #TODO: check file recv

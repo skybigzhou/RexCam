@@ -9,7 +9,7 @@ from multiprocessing.connection import Client
 def parse_frame_list(video_id, begin, end, fps):
     global local_address_d
     conn = Client(local_address_d, authkey="localData")
-    conn.send([video_id, begin, end])
+    conn.send([video_id, begin, end, fps])
     framelist = conn.recv()
     conn.close()
     return framelist

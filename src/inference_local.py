@@ -74,14 +74,15 @@ def inference_local(startTime, duration, model_path, source, nickname, task):
             ret, frame_list = cap.readFrameByTime(startTime, fps, "local.h264")
         else:
             # begin, end, fps, video_id
-            ret, frame_list = cap.readFrameByPeriod(startTime, startTime+duration, fps, "local.h264")
+            ret, frame_list = cap.readFrameByPeriod(startTime, startTime+duration, fps, "remote.h264")
 
         for frame in frame_list:
+            start_time = time.time()
             # Run the images through the inference engine and parse the results using
             # the parser API, note it is possible to get the output of doInference
             # and do the parsing manually, but since it is a ssd model,
             # a simple API is provided.
-            frame_resize = cv2.resize(frame, input_dict[model_switch])
+            frame_resize = cv2.resize(frame, input_dict[nickname])
             '''
             parsed_inference_results = model_dict[model_switch].parseResult(task,
                                                          model_dict[model_switch].doInference(frame_resize))
@@ -90,8 +91,8 @@ def inference_local(startTime, duration, model_path, source, nickname, task):
 
             # Compute the scale in order to draw bounding boxes on the full resolution
             # image.
-            yscale = float(frame.shape[0])/input_dict[model_switch][0]
-            xscale = float(frame.shape[1])/input_dict[model_switch][1]
+            yscale = float(frame.shape[0])/input_dict[nickname][0]
+            xscale = float(frame.shape[1])/input_dict[nickname][1]
             # Dictionary to be filled with labels and probabilities for MQTT
             cloud_output = {}
             # Get the detected objects and probabilities
@@ -120,11 +121,11 @@ def inference_local(startTime, duration, model_path, source, nickname, task):
                                 cv2.FONT_HERSHEY_SIMPLEX, 2.5, (255, 165, 20), 6)
                     # Store label and probability to send to cloud
                     cloud_output[output_map[obj['label']]] = obj['prob']
-        # Set the next frame in the local display stream.
-        # cv2.putText(frame, "FPS: {:.2f}".format(1.0 / (time.time() - start_time)), (10, 50), cv2.FONT_HERSHEY_SIMPLEX, yscale, (255, 165, 20), int(yscale*2))
-        cv2.putText(frame, "Frame Number: " + str(frame_idx+i+1), (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 2.5, (255, 165, 20), 6)
-        local_display.set_frame_data(frame)
-        print(json.dumps(cloud_output), time.time() - start_time, frame_idx+i+1)
+            # Set the next frame in the local display stream.
+            # cv2.putText(frame, "FPS: {:.2f}".format(1.0 / (time.time() - start_time)), (10, 50), cv2.FONT_HERSHEY_SIMPLEX, yscale, (255, 165, 20), int(yscale*2))
+            cv2.putText(frame, "Frame Number: ", (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 2.5, (255, 165, 20), 6)
+            local_display.set_frame_data(frame)
+            print(json.dumps(cloud_output), time.time() - start_time)
 
     except Exception as ex:
         print(ex)    

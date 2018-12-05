@@ -87,7 +87,7 @@ Listener used for model migration to remote device in
 distributed model management system.
 '''
 def remote_listener():
-    server = create_server_socket()
+    server = create_server_socket(0)
 
     def handle_client_connection(conn):
         name = conn.recv(1024)
@@ -118,7 +118,7 @@ Fetch remote model through local router
 def fetch_remote_model(nickname):
     #TODO: address = ?
     ip = 'localhost'
-    conn = create_client_socket(ip)
+    conn = create_client_socket(ip, 0)
     conn.send(nickname)
 
     #TODO: check file recv
