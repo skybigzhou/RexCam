@@ -66,6 +66,7 @@ def create_server_socket(mode):
 	host = return_local_ip()
 	s.bind((host, port))
 	'''
+	s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 	s.bind(('', port[mode]))
 	s.listen(5)
 	return s
