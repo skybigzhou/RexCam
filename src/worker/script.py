@@ -3,7 +3,15 @@ import argparse
 import os
 import inference
 from six import text_type as _text_type
+from threading import Thread
+from src.socket_utils import *
 
+
+# Control Params: 
+model_name = ""
+video_name = ""
+inference_mode = ""
+bAnalysis = False
 
 
 def _get_parser():
@@ -46,6 +54,28 @@ def _get_parser():
     return parser
 
 
+def ctrl_switch():
+    server = create_server_socket(3)
+
+    def handle_client_connection(conn):
+        # msg format = ?
+        msg = conn.recv(1024)
+        print("[APP] Deal with message ...")
+
+        # TODO: Change Control Params 
+        pass
+        
+        conn.send("ACK")
+        conn.close()
+
+    while True:
+        print("[APP] Application start listening")
+        conn, address = server.accept()
+        print("[APP] Accept connection from {}:{}".format(address[0], address[1]))
+        client_handler = Thread(target=handle_client_connection, name="ControllerWorker")
+        client_handler.start()
+
+
 def _semantic_check_and_run(args):
     framework = args.framework
     model_path = args.modelPath
@@ -80,7 +110,7 @@ def _semantic_check_and_run(args):
     #TODO: convert input label file
     if args.labelPath:
         pass
-    
+
 
 def main():
     parser = _get_parser()

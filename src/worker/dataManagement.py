@@ -57,7 +57,7 @@ def remote_listener():
 
     def handle_client_connection(conn):
         video_id = conn.recv(1024)
-        print("Receive request for {}".format(video_id))
+        print("[DATA] Receive request for {}".format(video_id))
 
         #TODO: get model_path from metadata
         data = min_send_data(video_id)
@@ -73,7 +73,7 @@ def remote_listener():
     while True:
         print("[DATA] Remote Listener start listening")
         conn, address = server.accept()
-        print("Accept connection from {}:{}".format(address[0], address[1]))
+        print("[DATA] Accept connection from {}:{}".format(address[0], address[1]))
         client_handler = Thread(target=handle_client_connection, args=(conn,), name= "remoteListenerDataWorker")
         client_handler.start()
 
@@ -90,7 +90,7 @@ def fetch_remote_data(video_id):
     
     response = conn.recv(1024)
     if response == "ACK":
-        print("Receive ACK from remote")
+        print("[DATA] Receive ACK from remote")
         conn.close()
 
 
@@ -138,9 +138,9 @@ def start_data_management(args):
     source = args.source
 
     if source == "Local":
-        print("Read video from disk will not turn on the Data Management")
+        print("[DATA] Read video from disk will not turn on the Data Management")
     else:
-        print("Data Management Local Save Starting ...")
+        print("[DATA] Data Management Local Save Starting ...")
 
     local_save = LocalSave(source, timeout, chunk_timeout, overlap)
     local_save.start()

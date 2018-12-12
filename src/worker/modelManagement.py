@@ -91,7 +91,7 @@ def remote_listener():
 
     def handle_client_connection(conn):
         name = conn.recv(1024)
-        print("Receive request for {}".format(name))
+        print("[MODEL] Receive request for {}".format(name))
         
         #TODO: get model_path from metadata
         model_path = os.path.join(model_dir, name + ".xml")  
@@ -107,7 +107,7 @@ def remote_listener():
     while True:
         print("[MODEL] Remote Listener start listening")
         conn, address = server.accept()
-        print("Accept connection from {}:{}".format(address[0], address[1]))
+        print("[MODEL] Accept connection from {}:{}".format(address[0], address[1]))
         client_handler = Thread(target = handle_client_connection, args = (conn,), name = "remoteListenerWorker")
         client_handler.start()
 
@@ -131,7 +131,7 @@ def fetch_remote_model(nickname):
 
     response = conn.recv(1024)
     if response == "ACK":
-        print("Receive ACK from remote")
+        print("[MODEL] Receive ACK from remote")
         conn.close()
 
     preload_models([model_path])

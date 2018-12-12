@@ -3,6 +3,7 @@ from wrapper import VideoCapture
 from videoFrameStack import LocalSave
 from modelManagement import local_address_m
 from multiprocessing.connection import Client
+from src.socket_utils import *
 import os
 import json
 import time
@@ -24,7 +25,7 @@ def intel_process(task, model_path, source, nickname='deploy_ssd_mobilenet_512')
     try:
         import awscam
     except ImportError:
-        print("WARNING: AWSCAM is not available in this device")
+        print("ERROR: AWSCAM is not available in this device")
 
     """ Entry point of the lambda function"""
     try:
@@ -40,15 +41,14 @@ def intel_process(task, model_path, source, nickname='deploy_ssd_mobilenet_512')
         # Create a local display instance that will dump the image bytes to a FIFO
         # file that the image can be rendered locally.
         
-        # Starting Local Display for demo
+        # Start Local Display for demo
         local_display = LocalDisplay('480p', 'results.mjpeg')
         local_display.start()
-        
-        controller = "/home/aws_cam/Desktop/controller.txt"
-        f = open(controller, "w")
-        f.write(nickname)
-        f.close()
 
+        # Start listening from remote controller
+        ctrl_listener = Thread(target=ctrl_switch, name= "MessageListener")
+        ctrl_listener.start()
+        
         # Set the threshold for detection
         detection_threshold = 0.25
         # The height and width of the training set images
@@ -67,16 +67,12 @@ def intel_process(task, model_path, source, nickname='deploy_ssd_mobilenet_512')
             if not ret:
                 raise Exception('Failed to get frame from the stream')
 
-            anaytics_switch = os.path.isfile(controller)
-            if (not anaytics_switch):
+            bAnalysis = False
+            if (not bAnalysis):
                 # Switch off
                 pass
             else:
                 # Switch on
-                # Model switch pattern
-                f = open(controller, "r")
-                nickname = str(f.readline().rstrip())
-
                 # Resize frame to the same size as the training set.
                 frame_resize = cv2.resize(frame, input_dict[nickname])
 
@@ -128,7 +124,7 @@ def intel_process(task, model_path, source, nickname='deploy_ssd_mobilenet_512')
             cv2.putText(frame, "FPS: {:.2f}".format(1.0 / (time.time() - start_time)), (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 2.5, (255, 165, 20), 6)
             local_display.set_frame_data(frame)
             # Send results to the cloud
-            if (not anaytics_switch):
+            if (not bAnalysis):
                 pass
             else:
                 print(json.dumps(cloud_output), time.time() - start_time)
