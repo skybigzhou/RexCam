@@ -7,7 +7,7 @@ from threading import Thread, Event
 from six import text_type as _text_type
 from multiprocessing.connection import Listener, Client
 import socket
-from socket_utils import *
+from src.socket_utils import *
 
 global local_address_d
 local_address_d = ('localhost', 6001)

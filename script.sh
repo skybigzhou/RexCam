@@ -19,10 +19,16 @@ if [ "${1,,}" = "switch" ]; then
 elif [ "${1,,}" = "run" ]; then
 
     if [ "${2,,}" = "real-time-test" ]; then
-        python src/script.py -f intel_mo_IR -mp /opt/awscam/artifacts/deploy_ssd_mobilenet_512 -t ssd -s AWSCAM -n deploy_ssd_mobilenet_512
+        python src/worker/script.py -f intel_mo_IR -mp /opt/awscam/artifacts/deploy_ssd_mobilenet_512 -t ssd -s AWSCAM -n deploy_ssd_mobilenet_512
     elif [ "${2,,}" = "local-disk-test" ]; then
-        python src/script.py -f intel_mo_IR -mp /opt/awscam/artifacts/deploy_ssd_mobilenet_512 -t ssd -s /home/aws_cam/Desktop/traffic.mp4
+        python src/worker/script.py -f intel_mo_IR -mp /opt/awscam/artifacts/deploy_ssd_mobilenet_512 -t ssd -s /home/aws_cam/Desktop/traffic.mp4
     elif [ "${2,,}" = "backward-test" ]; then
-        python src/script_local.py -st $3 -d $4 -mp /opt/awscam/artifacts/deploy_ssd_mobilenet_512 -t ssd -s AWSCAM -n deploy_ssd_mobilenet_512
+        python src/worker/script_local.py -st $3 -d $4 -mp /opt/awscam/artifacts/deploy_ssd_mobilenet_512 -t ssd -s AWSCAM -n deploy_ssd_mobilenet_512
+    elif [ "${2,,}" = "datamanagement" ]; then
+        echo "Data Management Start"
+        python src/worker/dataManagement.py -t 60
+    elif [ "${2,,}" = "modelmanagement" ]; then
+        echo "Model Management Start"
+        python src/worker/modelManagement.py -mps /opt/awscam/artifacts/mxnet_deploy_ssd_resnet50_300_FP16_FUSED.xml
     fi
 fi

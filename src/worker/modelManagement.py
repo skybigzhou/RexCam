@@ -3,7 +3,7 @@ import argparse
 import os
 import time
 import pprint
-from socket_utils import *
+from src.socket_utils import *
 try:
     import awscam
 except ImportError:

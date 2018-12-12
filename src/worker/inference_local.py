@@ -71,7 +71,7 @@ def inference_local(startTime, duration, model_path, source, nickname, task):
 
         if duration == 0:
             # timestamp, fps, video_id
-            ret, frame_list = cap.readFrameByTime(startTime, fps, "local.h264")
+            ret, frame_list = cap.readFrameByTime(startTime, fps, "remote.h264")
         else:
             # begin, end, fps, video_id
             ret, frame_list = cap.readFrameByPeriod(startTime, startTime+duration, fps, "remote.h264")
