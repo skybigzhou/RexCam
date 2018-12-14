@@ -47,7 +47,7 @@ def _get_parser():
     return parser
 
 
-#TODO: shorten the sending data
+#TODO: shorten the sending data (cut the video into chunk?)
 def min_send_data(name):
     return name
 

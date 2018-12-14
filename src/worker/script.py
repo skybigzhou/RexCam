@@ -6,7 +6,7 @@ import time
 import numpy as np
 import cv2
 from six import text_type as _text_type
-from threading import Thread
+from threading import Thread, Event
 from src.socket_utils import *
 from localDisplay import LocalDisplay
 from wrapper import VideoCapture
@@ -92,6 +92,7 @@ def intel_process(*args):
         
         cap = VideoCapture(video_dict[key])
         
+        local_time = time.time()
         while True:
             # Get a frame from the video stream
             start_time = time.time()
@@ -103,7 +104,7 @@ def intel_process(*args):
 
             if (not bAnalysis[key]):
                 # Switch off
-                pass
+                break
             else:
                 # Note that $KEY$ should not appear in this condition
                 # Switch on
@@ -157,10 +158,23 @@ def intel_process(*args):
             # Set the next frame in the local display stream.
             cv2.putText(frame, "FPS: {:.2f}".format(1.0 / (time.time() - start_time)), (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 2.5, (255, 165, 20), 6)
             local_display.set_frame_data(frame)
-            # Send results to the cloud
-            if (not bAnalysis[key]):
+            # Send results to the controller and Print results in local
+            if (not bAnalysis[key]) and (time.time() - local_time < 30):
                 pass
             else:
+                # TODO: Get Remote Controller IP
+                # TODO: Result filter
+                # msg format = |...ip...|..func..|..res...|
+                ctrl_ip = 'localhost'
+                conn = create_client_socket(ctrl_ip, 3)
+                # self_ip = ?
+                conn.send("{}|{}|{}".format(self_ip, task_dict[key], json.dumps(cloud_output)))
+                
+                res = conn.recv(1024)
+                if res == "ACK":
+                    print("[APP] Receive ACK from remote")
+                    conn.close()
+
                 print(json.dumps(cloud_output), time.time() - start_time)
 
     except Exception as ex:
@@ -215,13 +229,33 @@ def _get_parser():
     return parser
 
 
+class RunTimeThread(Thread):
+    """
+    Thread with stop() and isStop() func
+    """
+
+    def __init__(self, idx):
+        super(RunTimeThread, self).__init__()
+        self.idx = idx
+        self._stop_event = Event()
+
+    def run(self):
+        intel_process(self.idx)
+
+    def stop(self):
+        self._stop_event.set()
+
+    def isStop(self):
+        return self._stop_event.is_set()
+
+
 def ctrl_switch():
-    server = create_server_socket(3)
+    server = create_server_socket(2)
 
     def handle_client_connection(conn):
-        # msg format = ?
         '''
-        TODO: stop or (stop, pause) ?
+        TODO: stop or (stop + pause) ?
+        Message Format
         run    | idx | task | model | video
         switch | idx | task | model | video
         stop   | idx
@@ -238,9 +272,9 @@ def ctrl_switch():
                 model_dict[idx] = msg_list[3]
                 video_dict[idx] = msg_list[4]
                 # TODO: StoppableThread
-                # t = Thread(target=intel_process, args=(idx,))
-                # t.start()
-                # threads[idx] = t
+                t = RunTimeThread(idx)
+                threads[idx] = t
+                t.start()
 
             elif msg_list[0] == 'switch':
                 task_dict[idx] = msg_list[2]
@@ -249,8 +283,8 @@ def ctrl_switch():
 
             elif msg_list[0] == 'stop':
                 # TODO: StoppableThread
-                # threads[idx].stop()
-                pass
+                threads[idx].stop()
+                bAnalysis[idx] = False
 
         conn.send("ACK")
         conn.close()

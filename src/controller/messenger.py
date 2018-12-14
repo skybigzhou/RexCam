@@ -2,15 +2,25 @@ import sys
 import os
 from src.socket_utils import *
 from threading import Thread
+import time
 
-def send_message():
+def send_message(*args):
     # TODO: find ip address from metadata
-    ip = 'localhost'
-    conn = create_client_socket(ip, 2)
+    conn = create_client_socket(args[0], 2)
 
+    '''
+    TODO: stop or (stop + pause) ?
+    Message Format
+    run    | idx | task | model | video
+    switch | idx | task | model | video
+    stop   | idx
+    '''
     # TODO: what instruction to send
-    ins = "None Instruction Right Now"
-    conn.send(ins)
+    ins = ""
+    for s in args[1:]:
+        ins = ins + s + "|"
+    print(ins[:-1])
+    conn.send(ins[:-1])
 
     res = conn.recv(1024)
     if res == "ACK":
@@ -19,16 +29,25 @@ def send_message():
 
 
 def trigger():
-    server = create_server_socket(2)
+    server = create_server_socket(3)
 
     def handle_client_connection(conn):
         # msg format = |...ip...|..func..|..res...|
         msg = conn.recv(1024)
-        ip, func, res = msg.split(",")
+        ip, func, res = msg.split("|")
         print("[CRTL] Get Results {0:20} from [ip:{1}]. Start {2} ...".format(res, ip, func))
 
         # TODO: deal with instruction
-        send_message()
+        '''
+        TODO: controller logic (spotlight search)...
+        should return the results for which devices begin to run and which stop
+        '''
+        # DUMMY LOGIC
+        if ip == "10.150.92.158" and func == "ssd":
+            send_message("10.150.92.158", "stop", "foo")
+            time.sleep(5)
+            send_message("10.150.243.250", "run", "bar", "ssd", "deploy_ssd_mobilenet_512", "AWSCAM")
+
 
         conn.send("ACK")
         conn.close()
@@ -44,6 +63,9 @@ def trigger():
 
 def main():
     listener = Thread(target = trigger, name="TriggerListener")
+    listener.start()
+
+    send_message("10.150.92.158", "run", "foo", "ssd", "deploy_ssd_mobilenet_512", "AWSCAM")
     # rolling
     while True:
         pass
