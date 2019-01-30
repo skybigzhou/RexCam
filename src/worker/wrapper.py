@@ -120,4 +120,9 @@ class VideoCapture():
 
 
 
+    def get(self, index):
+        return self.cap.get(index)
 
+
+    def set(self, index, value):
+        return self.cap.set(index, value)

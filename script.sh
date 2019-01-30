@@ -29,6 +29,6 @@ elif [ "${1,,}" = "run" ]; then
         python src/worker/dataManagement.py -t 60
     elif [ "${2,,}" = "modelmanagement" ]; then
         echo "Model Management Start"
-        python src/worker/modelManagement.py -mps /opt/awscam/artifacts/mxnet_deploy_ssd_resnet50_300_FP16_FUSED.xml
+        python src/worker/modelManagement.py -mps /opt/awscam/artifacts/mxnet_deploy_ssd_resnet50_300_FP16_FUSED.xml /home/aws_cam/Desktop/reid/FP16/person-reidentification-retail-0079.xml
     fi
 fi

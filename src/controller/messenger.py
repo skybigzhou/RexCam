@@ -65,7 +65,7 @@ def main():
     listener = Thread(target = trigger, name="TriggerListener")
     listener.start()
 
-    send_message("10.150.92.158", "run", "foo", "ssd", "deploy_ssd_mobilenet_512", "AWSCAM")
+    send_message("10.150.92.158", "run", "foo", "ssd", "mxnet_deploy_ssd_resnet50_300_FP16_FUSED", "AWSCAM")
     # rolling
     while True:
         pass

@@ -80,7 +80,8 @@ def remote_listener():
 
 def fetch_remote_data(video_id):
     #TODO: address = ?
-    ip = 'localhost'
+    ip = "10.150.243.250"
+    # ip = 'localhost'
     conn = create_client_socket(ip, 1)
     conn.send(video_id)
 

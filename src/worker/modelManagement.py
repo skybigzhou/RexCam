@@ -118,8 +118,8 @@ Fetch remote model through local router
 def fetch_remote_model(nickname):
     #TODO: address = ?
     # Manual change remote ip
-    # ip = '10.150.243.250'
-    ip = 'localhost'
+    ip = '10.150.243.250'
+    # ip = 'localhost'
     conn = create_client_socket(ip, 0)
     conn.send(nickname)
 
@@ -165,9 +165,13 @@ def local_listener():
             '''
             fetch_remote_model(nickname)
 
-        ans = model_dict.get_model(nickname).parseResult(task, 
-                                    model_dict.get_model(nickname).doInference(frame))
+        if task == "reid":
+            ans = model_dict.get_model(nickname).doInference(frame)
+        else:
+            ans = model_dict.get_model(nickname).parseResult(task, 
+                                        model_dict.get_model(nickname).doInference(frame))
         conn.send(ans)
+
         conn.close()
 
     listener.close()

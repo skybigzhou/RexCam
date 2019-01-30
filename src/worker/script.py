@@ -24,7 +24,21 @@ bAnalysis = dict()
 # Thread Pool
 threads = dict()
 
+# re-id query
+query_dict = dict()
+st_dict = dict()
 
+# detection-tracker switch
+DT_switch = False
+time_Threshold = 3
+
+counter = 0
+frame_counter = 0
+
+'''
+Input:
+Output:
+'''
 def parse_to_modelManagement(task, frame, nickname):
     global local_address_m
     conn = Client(local_address_m, authkey = 'localModel')
@@ -34,6 +48,46 @@ def parse_to_modelManagement(task, frame, nickname):
     return results
 
 
+'''
+Input:
+Output:
+'''
+def cal_cosine_similarity(v1, v2):
+    dot = np.dot(v1, v2)
+    norm_v1 = np.linalg.norm(v1)
+    norm_v2 = np.linalg.norm(v2)
+    cos = dot / (norm_v1 * norm_v2)
+    return cos
+
+
+''' 
+Input: Cropped Person Image "image"
+Output: Image Descriptor "image_id", return for calculating cosine similarity
+'''
+def reid_descriptor(image):
+    image_resize = cv2.resize(image, (64, 160))
+    # print(image_resize)
+    results = parse_to_modelManagement('reid', image_resize, 'person-reidentification-retail-0079')
+    image_id = results['embd/dim_red/conv']
+    return image_id   
+
+
+'''
+Update tracker and convert bbox into (x, y, x+w, y+h) format
+Input: Current frame "frame"
+Output: tracking bbox "ret_bbox", out of tracking flag "tracking_flag" 
+'''
+def tracking(frame, tracker):
+    ok, bbox = tracker.update(frame)
+    ret_bbox = list()
+    if ok:
+        ret_bbox[0] = int(bbox[0])
+        ret_bbox[1] = int(bbox[1])
+        ret_bbox[2] = int(bbox[0] + bbox[2])
+        ret_bbox[3] = int(bbox[1] + bbox[3])
+    return ret_bbox, ok
+
+
 # TODO: parse the input size
 # def intel_process(task, source, nickname='deploy_ssd_mobilenet_512'):
 '''
@@ -41,6 +95,8 @@ remote controller call: intel_process(idx)
 local input call: intel_process(task, source, nickname) / intel_process(task, source)
 '''
 def intel_process(*args):
+    descriptor_path = '/home/aws_cam/Desktop/reid_query/'
+
     # Merge different parameter format and setup process $KEY$
     key = ""
     if len(args) == 1:
@@ -54,15 +110,16 @@ def intel_process(*args):
         task_dict[key], video_dict[key] = (args[0], args[1])
         if len(args) == 2:
             # By default
-            model_dict[key] = "deploy_ssd_mobilenet_512"
+            model_dict[key] = "mxnet_deploy_ssd_resnet50_300_FP16_FUSED"
         else:
             model_dict[key] = args[2]
-        bAnalysis[key] = True
+        bAnalysis[key] = "True"
 
     else:
         # Invalid parameters
         return
 
+    print("Process key: " + key)
     """ Entry point of the lambda function"""
     try:
         # This object detection model is implemented as single shot detector (ssd), since
@@ -78,7 +135,7 @@ def intel_process(*args):
         # file that the image can be rendered locally.
         
         # Start Local Display for demo
-        local_display = LocalDisplay('480p', 'results.mjpeg')
+        local_display = LocalDisplay('480p', 'results_' + key + '.mjpeg')
         local_display.start()
 
         # Set the threshold for detection
@@ -91,21 +148,37 @@ def intel_process(*args):
         # Do inference until the lambda is killed.
         
         cap = VideoCapture(video_dict[key])
-        
+        FPS = cap.get(cv2.CAP_PROP_FPS)
+        cap.set(1, int(int(st_dict[key]) * FPS))
+
         local_time = time.time()
+        num = 0
         while True:
+            # Disappear Trigger
+            disappear = False
+
             # Get a frame from the video stream
             start_time = time.time()
             ret, frame = cap.readLastFrame()
             if not ret:
                 raise Exception('Failed to get frame from the stream')
+            
             # To ensure each frame analysis success set model name into a tmp parameters
             nickname = model_dict[key]
+            task = task_dict[key]
+            query_file = query_dict[key]
 
-            if (not bAnalysis[key]):
+            if not bAnalysis[key] == "True":
                 # Switch off
-                break
+                pass
             else:
+                # ranking reid_descriptor
+                reid_rank = dict()
+                reid_image = dict()
+
+                # get query descriptor
+                d_query = np.load(descriptor_path + query_file)
+
                 # Note that $KEY$ should not appear in this condition
                 # Switch on
                 # Resize frame to the same size as the training set.
@@ -127,18 +200,21 @@ def intel_process(*args):
                 # image.
                 yscale = float(frame.shape[0])/input_dict[nickname][0]
                 xscale = float(frame.shape[1])/input_dict[nickname][1]
+                input_width = input_dict[nickname][1]
                 # Dictionary to be filled with labels and probabilities for MQTT
                 cloud_output = {}
+                image_id = 0
                 # Get the detected objects and probabilities
                 for obj in parsed_inference_results[task]:
                     if obj['prob'] > detection_threshold:
                         # Add bounding boxes to full resolution frame
                         xmin = int(xscale * obj['xmin'])
-                               # + int((obj['xmin'] - input_width/2) + input_width/2)
+                                # + int((obj['xmin'] - input_width/2) + input_width/2)
                         ymin = int(yscale * obj['ymin'])
-                        xmax = int(xscale * obj['xmax']) 
-                               # + int((obj['xmax'] - input_width/2) + input_width/2)
+                        xmax = int(xscale * obj['xmax'])
+                                # + int((obj['xmax'] - input_width/2) + input_width/2)
                         ymax = int(yscale * obj['ymax'])
+                        
                         # See https://docs.opencv.org/3.4.1/d6/d6e/group__imgproc__draw.html
                         # for more information about the cv2.rectangle method.
                         # Method signature: image, point1, point2, color, and tickness.
@@ -149,36 +225,61 @@ def intel_process(*args):
                         # for more information about the cv2.putText method.
                         # Method signature: image, text, origin, font face, font scale, color,
                         # and tickness
+                        '''
                         cv2.putText(frame, "{}: {:.2f}%".format(output_map[obj['label']],
                                                                    obj['prob'] * 100),
                                     (xmin, ymin-text_offset),
                                     cv2.FONT_HERSHEY_SIMPLEX, 2.5, (255, 165, 20), 6)
                         # Store label and probability to send to cloud
+                        '''
                         cloud_output[output_map[obj['label']]] = obj['prob']
+
+                        # start reid
+                        if output_map[obj['label']] == 'person':
+                            imcrop = frame[ymin:ymax, xmin:xmax]
+                            '''
+                            global counter
+                            cv2.imwrite('/home/aws_cam/Desktop/sample/' + str(counter) + '.jpg', imcrop)
+                            counter += 1
+                            '''
+                            if imcrop.shape[0] > 0 and imcrop.shape[1] > 0:
+                                d = reid_descriptor(imcrop)
+                                reid_rank[cal_cosine_similarity(d, d_query)] = image_id
+                                reid_image[image_id] = imcrop
+                                image_id += 1
+
+                # cv2.imwrite('/home/aws_cam/Desktop/result_{}.jpg'.format(num), frame)
+                # print(reid_rank.keys())
+                if reid_rank:
+                    sorted_reid_rank = sorted(reid_rank.keys())
+                    # print(sorted_reid_rank[-1])
+                
+                    cv2.imwrite('/home/aws_cam/Desktop/reid_result/' + str(num) + '.jpg', reid_image[reid_rank[sorted_reid_rank[-1]]])
+                num += 1
+
             # Set the next frame in the local display stream.
             cv2.putText(frame, "FPS: {:.2f}".format(1.0 / (time.time() - start_time)), (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 2.5, (255, 165, 20), 6)
             local_display.set_frame_data(frame)
             # Send results to the controller and Print results in local
-            if (not bAnalysis[key]) and (time.time() - local_time < 30):
+            if not bAnalysis[key] == "True":
                 pass
             else:
-                # TODO: Get Remote Controller IP
-                # TODO: Result filter
-                # msg format = |...ip...|..func..|..res...|
-                ctrl_ip = 'localhost'
-                conn = create_client_socket(ctrl_ip, 3)
-                # self_ip = ?
-                conn.send("{}|{}|{}".format(self_ip, task_dict[key], json.dumps(cloud_output)))
+                pass
+                '''
+                if frame_counter > :
+                    ctrl_ip = "192.168.0.143"
+                    conn = create_client_socket(ctrl_ip, 3)
+                    self_ip = "192.168.0.185"
+                    conn.send("{}|{}|{}".format(self_ip, task_dict[key], "disappear"))
+
+                    res = conn.recv(1024)
+                    if res == "ACK":
+                        print("[APP] Receive ACK from remote")
+                        conn.close()
+                '''
                 
-                res = conn.recv(1024)
-                if res == "ACK":
-                    print("[APP] Receive ACK from remote")
-                    conn.close()
-
-                print(json.dumps(cloud_output), time.time() - start_time)
-
     except Exception as ex:
-        print(ex)
+        print("Exception:", ex)
 
 
 def mxnet_process(model_path, weight_path):
@@ -256,8 +357,8 @@ def ctrl_switch():
         '''
         TODO: stop or (stop + pause) ?
         Message Format
-        run    | idx | task | model | video
-        switch | idx | task | model | video
+        run    | idx | task | model | video | analysis | query_file | start_time
+        switch | idx | task | model | video | analysis | query_file | start_time
         stop   | idx
         '''
         msg = conn.recv(1024)
@@ -271,6 +372,14 @@ def ctrl_switch():
                 task_dict[idx] = msg_list[2]
                 model_dict[idx] = msg_list[3]
                 video_dict[idx] = msg_list[4]
+                bAnalysis[idx] = msg_list[5]
+                query_dict[idx] = msg_list[6]
+                st_dict[idx] = msg_list[7]
+                print("[APP] Begin to run {}".format(task_dict[idx]))
+                if bAnalysis[idx] == "True":
+                    print("[APP] Initial analysis on")
+                else:
+                    print("[APP] Initial analysis off")
                 # TODO: StoppableThread
                 t = RunTimeThread(idx)
                 threads[idx] = t
@@ -280,11 +389,17 @@ def ctrl_switch():
                 task_dict[idx] = msg_list[2]
                 model_dict[idx] = msg_list[3]
                 video_dict[idx] = msg_list[4]
+                x = bAnalysis[idx] = msg_list[5]
+                query_dict[idx] = msg_list[6]
+                st_dict[idx] = msg_list[7]
+                print("[APP] Switch to [task: {}], [model: {}], [video: {}], [analysis: {}]".format(
+                    task_dict[idx], model_dict[idx], video_dict[idx], lambda x: "on" if x == "True" else "off"))
 
             elif msg_list[0] == 'stop':
                 # TODO: StoppableThread
-                threads[idx].stop()
-                bAnalysis[idx] = False
+                # threads[idx].stop()
+                bAnalysis[idx] = "False"
+                print("[APP] Stop analysis")
 
         conn.send("ACK")
         conn.close()
@@ -293,7 +408,7 @@ def ctrl_switch():
         print("[APP] Application start listening")
         conn, address = server.accept()
         print("[APP] Accept connection from {}:{}".format(address[0], address[1]))
-        client_handler = Thread(target=handle_client_connection)
+        client_handler = Thread(target=handle_client_connection, args=(conn,))
         client_handler.start()
 
 
@@ -346,9 +461,9 @@ def _semantic_check_and_run(args):
 
 
 def main():
-    localInput = True
+    localInput = False
     # local semantic check and run
-    if localInput == True:
+    if localInput:
         parser = _get_parser()
         args = parser.parse_args()
         _semantic_check_and_run(args)
@@ -357,9 +472,37 @@ def main():
         ctrl_listener.start()
 
     # Keep main awake
-    timeout = 10*60
-    time.sleep(timeout)
+    ctrl_listener.join()
 
 
 if __name__ == "__main__":
+
+    '''
+    # tracking initiation
+    (major_ver, minor_ver, subminor_ver) = (cv2.__version__).split('.')
+    tracker_types = ['BOOSTING', 'MIL', 'KCF', 'TLD', 'MEDIANFLOW', 'GOTURN', 'MOSSE', 'CSRT']
+    tracker_type = tracker_types[2]
+
+    global tracker
+    if int(minor_ver) < 3:
+        tracker = cv2.Tracker_create(tracker_type)
+    else:
+        if tracker_type == 'BOOSTING':
+            tracker = cv2.TrackerBoosting_create()
+        if tracker_type == 'MIL':
+            tracker = cv2.TrackerMIL_create()
+        if tracker_type == 'KCF':
+            tracker = cv2.TrackerKCF_create()
+        if tracker_type == 'TLD':
+            tracker = cv2.TrackerTLD_create()
+        if tracker_type == 'MEDIANFLOW':
+            tracker = cv2.TrackerMedianFlow_create()
+        if tracker_type == 'GOTURN':
+            tracker = cv2.TrackerGOTURN_create()
+        if tracker_type == 'MOSSE':
+            tracker = cv2.TrackerMOSSE_create()
+        if tracker_type == "CSRT":
+            tracker = cv2.TrackerCSRT_create()
+    '''
+
     main()
