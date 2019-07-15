@@ -4,44 +4,44 @@ from src.socket_utils import *
 from threading import Thread
 import time
 
+# Match cam_id with ip_address
+cam_ip = {1:"192.168.0.185", 2:"192.168.0.185", 3:"192.168.0.185", 4:"192.168.0.185", 5:"192.168.0.185"}
+video_dict = {1:"/home/aws_cam/Desktop/local_video/c1_v1_m20.mp4",
+              2:"/home/aws_cam/Desktop/local_video/c4_v2_m20.mp4",
+              3:"/home/aws_cam/Desktop/local_video/c2_v3_m20.mp4",
+              4:"/home/aws_cam/Desktop/local_video/c3_v4_m20.mp4",
+              5:"/home/aws_cam/Desktop/local_video/c5_v5_m20.mp4"}
 
-'''
-Spatial Temporal Correlation of DukeMTMC dataset
-'''
+model = "mxnet_deploy_ssd_resnet50_300_FP16_FUSED"
+global total_frames
+global global_query
+
 corr_matrix = [
-    [0, 1],
-    [0, 1, 2, 4],
-    [1, 2, 3],
-    [2, 3],
-    [1, 2, 4, 5],
-    [4, 5, 6],
-    [5, 6, 7],
-    [0, 6, 7]
-]
+        [1, 2],
+        [1, 2, 3, 4],
+        [2, 3, 5],
+        [2, 4, 5],
+        [3, 4, 5],
+    ]
 
 start_times = [
-    [ 0,  5,  0,  0, 40,  0, 35, 20],
-    [10,  0,  0,  0,  5,  0,  0, 10],
-    [ 0,  0,  0,  5,  0,  0,  0,  0],
-    [ 0,  0,  5,  0, 15,  0,  0,  0],
-    [30,  5,  0, 20,  0,  5,  0, 15],
-    [ 0,  0,  0,  0,  5,  0,  5,  0],
-    [40,  0,  0,  0,  0,  0,  0, 10],
-    [10,  5,  0,  0, 10,  0, 10,  0]
+    [ 0, 10, 20,  0, 30],
+    [15,  0,  0, 20,  5],
+    [35,  5,  0, 10,  0],
+    [ 0,  0, 10,  0, 25],
+    [40,  5,  0,  0,  0],
 ]
 
 end_times = [
-    [ 6, 80,  0,  0, 60,  0, 55, 55],
-    [45,  6, 10,  0, 30,  0,  0, 30],
-    [ 0, 15,  6, 40, 10,  0,  0,  0],
-    [ 0,  0, 30,  6, 30,  0,  0,  0],
-    [65, 55, 50, 30,  6, 50, 10, 35],
-    [ 0,  0,  0,  0, 30,  6, 15,  0],
-    [65,  0,  0,  0, 15, 55,  6, 30],
-    [55, 20,  0,  0, 40,  0,150,  6]
+    [ 6, 45, 50,  0, 70],
+    [40,  6, 60, 35, 25],
+    [45, 20,  6, 25, 10],
+    [ 0,  0, 25,  6, 60],
+    [60, 20, 10,  0,  6],
 ]
 
-end_times = [[f_rate * x for x in y] for y in end_times]
+def get_id_from_ip(ip):
+    return cam_ip.keys()[cam_ip.values().index(ip)]
 
 
 def send_message(*args):
@@ -72,36 +72,30 @@ def trigger():
     server = create_server_socket(3)
 
     def handle_client_connection(conn):
-        # msg format = |...ip...|..func..|..res...|
-        msg = conn.recv(1024)
-        ip, func, res = msg.split("|")
-        print("[CRTL] Get Results {0:20} from [ip:{1}]. Start {2} ...".format(res, ip, func))
+        # msg format = |...ip...|..True..|..res..|..duration..|..last_apperance..|
+        # msg format = |...ip...|..False..|..None..|..duration..|..last_apperance..|
+        msg = conn.recv(8192)
+        # print(msg)
 
-        # TODO: deal with instruction
-        '''
-        TODO: controller logic (spotlight search)...
-        should return the results for which devices begin to run and which stop
-        '''
-        # DUMMY LOGIC
-        if ip == "10.150.92.158" and func == "ssd":
-            if res == "disappear":
-                # send_message("10.150.92.158", "stop", "duke")
-                # time.sleep(5)
-                # send_message("10.150.243.250", "run", "duke", "ssd", "deploy_ssd_mobilenet_512", "/home/aws_cam/Desktop/local_video/00000.MTS", "True")
-                pass
-            else:
-                send_message("10.150.92.158", "stop", "foo")
-                time.sleep(5)
-                send_message("10.150.243.250", "switch", "bar", "ssd", "deploy_ssd_mobilenet_512", "AWSCAM", "True")
-
-        if ip == "10.150.243.250" and func == "ssd" and res == "stop":
-            send_message("10.150.243.250", "stop", "bar")
-
-        if ip == "10.150.243.250" and func == "ssd" and res == "switch_video":
-            send_message("10.150.243.250", "switch", "bar", "ssd", "deploy_ssd_mobilenet_512", "remote.h264", "True")
+        ip, found, res, duration, last_apperance = msg.split("|")
+        global total_frames
+        total_frames += int(duration)
+        print(total_frames)
+        # print("[CRTL] Get Results {0} from [ip:{1}]. Found or not:{2} ...".format(res, ip, func))
+        cam_id = get_id_from_ip(ip)
 
         conn.send("ACK")
         conn.close()
+
+        # deal with instruction
+        if found == "True":
+            for corr_cam_id in corr_matrix[cam_id - 1]:
+                start_time = int(last_apperance) + start_times[cam_id - 1][corr_cam_id - 1]
+                end_time = int(last_apperance) + end_times[cam_id - 1][corr_cam_id - 1]
+                send_message(cam_ip[corr_cam_id], "run", str(corr_cam_id) + "_" + str(start_time), "ssd", model, 
+                                video_dict[corr_cam_id], "True", global_query, str(start_time), str(end_time))
+            
+        
 
     while True:
         print("[CRTL] Controller start listening")
@@ -117,14 +111,28 @@ def main():
     listener.start()
 
     # TEST 1
-    send_message("192.168.0.185", "run", "foo", "ssd", "mxnet_deploy_ssd_resnet50_300_FP16_FUSED", 
-                "/home/aws_cam/Desktop/local_video/c1_v1_m20.mp4", "True", "query_1.npy", "21")
+    '''
+    send_message(cam_ip[1], "run", "foo", "ssd", model, 
+                video_dict[1], "True", "query_1.npy", "21", "")
+    '''
     # send_message("10.150.243.250", "run", "bar", "ssd", "deploy_ssd_mobilenet_512", "AWSCAM", "False")
 
     # TEST 2
     # send_message("10.150.92.158", "run", "duke", "ssd", "deploy_ssd_mobilenet_512", "/home/aws_cam/Desktop/local_video/00000.MTS", "True")
+    query_list = {(1, "21", "query_1.npy")}
 
-    # rolling
+    for query in query_list:
+        global total_frames
+        global global_query
+        total_frames = 0
+
+        cam_id = query[0]
+        frame_id = query[1]
+        global_query = query[2]
+        start_time = int(frame_id) + start_times[cam_id][cam_id]
+        end_time = int(frame_id) + end_times[cam_id][cam_id]
+        send_message(cam_ip[cam_id], "run", "foo", "ssd", model, video_dict[cam_id], "True", global_query, str(start_time), str(end_time))
+
     listener.join()
 
 if __name__=="__main__":

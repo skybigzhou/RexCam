@@ -27,6 +27,8 @@ threads = dict()
 # re-id query
 query_dict = dict()
 st_dict = dict()
+et_dict = dict()
+reid_threshold = 0.5
 
 # detection-tracker switch
 DT_switch = False
@@ -86,6 +88,13 @@ def tracking(frame, tracker):
         ret_bbox[2] = int(bbox[0] + bbox[2])
         ret_bbox[3] = int(bbox[1] + bbox[3])
     return ret_bbox, ok
+
+
+def CheckExitTime(start, end, duration, FPS):
+    if int(start * FPS) + duration < int(end * FPS):
+        return True
+    else:
+        return False
 
 
 # TODO: parse the input size
@@ -153,7 +162,10 @@ def intel_process(*args):
 
         local_time = time.time()
         num = 0
-        while True:
+        last = 0
+        Match_identity = list()
+
+        while CheckExitTime(int(st_dict[key]), int(et_dict[key]), num, FPS):
             # Disappear Trigger
             disappear = False
 
@@ -218,9 +230,10 @@ def intel_process(*args):
                         # See https://docs.opencv.org/3.4.1/d6/d6e/group__imgproc__draw.html
                         # for more information about the cv2.rectangle method.
                         # Method signature: image, point1, point2, color, and tickness.
-                        cv2.rectangle(frame, (xmin, ymin), (xmax, ymax), (255, 165, 20), 10)
+                        # cv2.rectangle(frame, (xmin, ymin), (xmax, ymax), (255, 165, 20), 10)
+                        
                         # Amount to offset the label/probability text above the bounding box.
-                        text_offset = 15
+                        # text_offset = 15
                         # See https://docs.opencv.org/3.4.1/d6/d6e/group__imgproc__draw.html
                         # for more information about the cv2.putText method.
                         # Method signature: image, text, origin, font face, font scale, color,
@@ -245,7 +258,7 @@ def intel_process(*args):
                             if imcrop.shape[0] > 0 and imcrop.shape[1] > 0:
                                 d = reid_descriptor(imcrop)
                                 reid_rank[cal_cosine_similarity(d, d_query)] = image_id
-                                reid_image[image_id] = imcrop
+                                reid_image[image_id] = (ymin, ymax, xmin, xmax, num)
                                 image_id += 1
 
                 # cv2.imwrite('/home/aws_cam/Desktop/result_{}.jpg'.format(num), frame)
@@ -253,9 +266,12 @@ def intel_process(*args):
                 if reid_rank:
                     sorted_reid_rank = sorted(reid_rank.keys())
                     # print(sorted_reid_rank[-1])
-                
-                    cv2.imwrite('/home/aws_cam/Desktop/reid_result/' + str(num) + '.jpg', reid_image[reid_rank[sorted_reid_rank[-1]]])
+                    if sorted_reid_rank[-1] > reid_threshold:
+                        # cv2.imwrite('/home/aws_cam/Desktop/reid_result/' + str(num) + '.jpg', reid_image[reid_rank[sorted_reid_rank[-1]]])
+                        Match_identity.append(reid_image[reid_rank[sorted_reid_rank[-1]]])
+                        last = num
                 num += 1
+                # print("Match_identity:", Match_identity)
 
             # Set the next frame in the local display stream.
             cv2.putText(frame, "FPS: {:.2f}".format(1.0 / (time.time() - start_time)), (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 2.5, (255, 165, 20), 6)
@@ -277,7 +293,21 @@ def intel_process(*args):
                         print("[APP] Receive ACK from remote")
                         conn.close()
                 '''
-                
+
+        last_apperance = int(st_dict[key]) + int(last / FPS) + 1
+        # print("Match_identity:", Match_identity)    
+        ctrl_ip = "192.168.0.143"
+        conn = create_client_socket(ctrl_ip, 3)
+        self_ip = "192.168.0.185"
+        if Match_identity:
+            conn.send("{}|{}|{}|{}|{}".format(self_ip, "True", Match_identity, num, last_apperance))
+        else:
+            conn.send("{}|{}|{}|{}|{}".format(self_ip, "False", "None", num, last_apperance))
+        res = conn.recv(1024)
+        if res == "ACK":
+            print("[APP] Receive ACK from remote")
+            conn.close()
+
     except Exception as ex:
         print("Exception:", ex)
 
@@ -357,8 +387,8 @@ def ctrl_switch():
         '''
         TODO: stop or (stop + pause) ?
         Message Format
-        run    | idx | task | model | video | analysis | query_file | start_time
-        switch | idx | task | model | video | analysis | query_file | start_time
+        run    | idx | task | model | video | analysis | query_file | start_time | end_time
+        switch | idx | task | model | video | analysis | query_file | start_time | end_time
         stop   | idx
         '''
         msg = conn.recv(1024)
@@ -375,6 +405,7 @@ def ctrl_switch():
                 bAnalysis[idx] = msg_list[5]
                 query_dict[idx] = msg_list[6]
                 st_dict[idx] = msg_list[7]
+                et_dict[idx] = msg_list[8]
                 print("[APP] Begin to run {}".format(task_dict[idx]))
                 if bAnalysis[idx] == "True":
                     print("[APP] Initial analysis on")
@@ -392,6 +423,7 @@ def ctrl_switch():
                 x = bAnalysis[idx] = msg_list[5]
                 query_dict[idx] = msg_list[6]
                 st_dict[idx] = msg_list[7]
+                et_dict[idx] = msg_list[8]
                 print("[APP] Switch to [task: {}], [model: {}], [video: {}], [analysis: {}]".format(
                     task_dict[idx], model_dict[idx], video_dict[idx], lambda x: "on" if x == "True" else "off"))
 
